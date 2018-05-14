@@ -1,0 +1,20 @@
+#!/bin/bash
+if [ $# -eq 0 ]
+then
+        echo "Il n'y a pas d'arguments"
+	exit 1
+else
+        if [ -d $1 ]
+        then
+                if [[ $2 =~ ^[0-9]+$ ]]
+                then
+                        ls $1 | grep ".arch"
+                else
+                        echo "Le numéro de port sélectionné n'est pas correct ou n'est pas un numéro"
+                	exit 1
+		fi
+        else
+                echo "Le serveur sélectionné n'existe pas"
+		exit 1
+        fi
+fi

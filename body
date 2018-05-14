@@ -1,0 +1,15 @@
+#!/bin/bash
+echo "jesuislescripttoto"
+#!/bin/bash
+list=ls $HOME
+for f in $HOME
+do
+	echo "$f"
+done
+#jenesuispasunscript
+#jenesuisqu'unfichiercommenté
+#jen'estpasd'utilité
+Je suis un simple fichier texte
+avec plusieurs lignes
+remplis de mots
+cacaman
