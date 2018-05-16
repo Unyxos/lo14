@@ -15,7 +15,22 @@ function ls {
 
 function cd {
 	basedir="/"
-	echo $basedir$1
+	cur_dir=$2
+	echo $cur_dir
+	#dir=$(echo $ligne | cut -d ' ' -f2 | sed 's/^\(.\).*$/\1/g') ''''
+	case $1 in
+		/) echo '/';;
+		..)
+			if [[ $cur_dir == "/" ]]; then
+				echo "/"
+			else
+				echo "on bouge"
+			fi
+		;;
+		/*) echo 'navigation par chemin absolu';;
+		*) echo 'navigation par chemin relatif';;
+	esac
+	echo $1
 }
 
 function cat {
@@ -58,7 +73,7 @@ function browse {
                 	if [ -f $3 ]
 			then
 				echo "Browse enable - Browsing $3"
-				directory="/"
+				directory="/test"
 				while [[ $userInputCommand != 'quit' ]]; do
 					read -a userInputArray -p "vsh:$directory> "
 					userInputCommand=${userInputArray[0]}
@@ -66,7 +81,8 @@ function browse {
 					case $userInputCommand in
 						pwd) pwd $directory;;
 						ls) ls;;
-						cd) directory=$(cd $userInputArray);;
+						#cd) directory=$(cd $userInputArray $directory);;
+						cd) cd $userInputArray $directory;;
 						cat) cat;;
 						rm) rm;;
 						help) help;;
