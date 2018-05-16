@@ -5,6 +5,10 @@ function pwd {
 	echo $1
 }
 
+function  konami_code {
+	echo "https://www.youtube.com/watch?v=CRkzItBabzs"
+}
+
 function ls {
 	echo 'ls: not working yet!'
 }
@@ -23,7 +27,7 @@ function rm {
 }
 
 function help {
-	echo 'THIS IS THE HELP : https://www.youtube.com/watch?v=_FdnA4SyYzE'
+	echo 'help to write'
 }
 
 #fonction permettant de lister les archives présentes sur le serveur
@@ -67,6 +71,7 @@ function browse {
 						rm) rm;;
 						help) help;;
 						quit) ;;
+						upupdowndownleftrightleftrightba) konami_code;;
 						*) echo -e "\e[91mUnknown command, please try another command or type \e[3m\e[1mhelp\e[0m\e[91m to get a list of commands and their usage.\e[39m"
 					esac
 				done
