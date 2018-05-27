@@ -11,7 +11,7 @@ To launch client on "list" mode :
 `./vsh -list <server_ip_address> <port>`
 
 To launch client on "browse" mode :
-`./vsh -list <server_ip_address> <port> <archive_name>`
+`./vsh -browse <server_ip_address> <port> <archive_name>`
 
 To launch client on "extract" mode :
 `./vsh -extract <server_ip_address> <port> <archive_name>`
