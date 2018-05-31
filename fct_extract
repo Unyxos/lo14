@@ -1,4 +1,4 @@
-#!/bin/bash
+#Nécessaire pour calcul droit
 testrights()
 {
 	nb=0
@@ -20,6 +20,8 @@ testrights()
 	fi
 	echo $nb
 }
+
+#Fonction principale du calcul des droits des fichiers/dossiers
 calculdroit{
 if [ $# -eq 0 ]
 then
@@ -53,6 +55,12 @@ else
 	fi
 fi
 }
+
+
+
+
+
+#Nécessaire pour la fonction extract
 makefile()
 {
 #echo $2
@@ -68,7 +76,7 @@ else
 fi
 sudo chmod $(calculdroit $1) extraction/$2
 }
-
+#Nécessaire pour la fonction extract
 makedir()
 {
 #echo "dir"
@@ -78,6 +86,7 @@ mkdir extraction/$2
 sudo chmod $(calculdroit $1) extraction/$2
 }
 
+#Fonction principale de l'extraction des fichiers et dossiers de l'archives dans le dossier extraction
 extract(){
 #Ici on vient récupérer l'arborescence racine contenant les dossiers 
 #de l'archive (contenu dans la première ligne directory)
@@ -111,6 +120,12 @@ then
 fi
 done < header
 }
+
+
+
+
+
+#Fonction principale de "rangement" des fichiers extraits
 placement(){
 changement="false"
 str=""
@@ -175,5 +190,3 @@ do
 done < header
 echo $str
 }
-
-
