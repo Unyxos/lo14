@@ -101,7 +101,7 @@ function commande-list {
 
 # Renvoi le contenu du fichier Test.arch (à modifier plus tard!)
 function commande-extract {
-    echo "$(<Test.arch)"
+    echo "$(<$1)"
 }
 # On accepte et traite les connexions
 accept-loop
