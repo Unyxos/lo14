@@ -25,4 +25,4 @@ To launch client on "extract" mode :
 		[ ] cd
 		[ ] rm
 		[ ] ls
-	[o] Extract : partially
+	[x] Extract
