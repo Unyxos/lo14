@@ -3,21 +3,21 @@
 directory test/
 A drwxr-xr-x
 B drwxr-xr-x
-toto -rwxr-xr-x 1 2
+toto -rwxr-xr-x 42 1 2
 @
-directory test/A/
+directory test/A
 A1 drwxr-xr-x
-titi -rw-r--r-- 3 6
+titi -rw-r--r-- 42 3 6
 @
-directory test/A1/
+directory test/A/A1
 @
-directory test/B/
+directory test/B
 B1 drwxr-xr-x
-tete -rwxr-xr-x 9 3
-tyty -rw-r--r-- 12 3
+tete -rwxr-xr-x 42 9 3
+tyty -rw-r--r-- 42 12 3
 @
-directory test/B1/
-caca -rw-r--r-- 15 1
+directory test/B/B1
+caca -rw-r--r-- 42 15 1
 @
 #!/bin/bash
 echo "jesuislescripttoto"
