@@ -1,0 +1,60 @@
+#!/bin/bash
+makefile()
+{
+#echo $2
+touch extraction/$2
+#echo "droit : $1"
+#echo $(bash testdroit $1)
+somme=$(($3+$4-1))
+if [ $4 -ne 0 ]
+then
+	cat body | head -n $somme | tail -n $4 > extraction/$2
+else
+	touch extraction/$2
+fi
+sudo chmod $(bash testdroit $1) extraction/$2
+}
+
+makedir()
+{
+#echo "dir"
+mkdir extraction/$2
+#echo "droit : $1"
+#echo $(bash testdroit $1)
+sudo chmod $(bash testdroit $1) extraction/$2
+}
+
+#Ici on vient récupérer l'arborescence racine contenant les dossiers 
+#de l'archive (contenu dans la première ligne directory)
+#Ensuite on créé les dossiers et on les place dans le bonne ordre.
+root_dir=$(cat header | head -n 1 | cut -d' ' -f2 | sed 's/\(.*\)\/$/\1/')
+#echo $root_dir
+mkdir -p extraction/$root_dir
+
+while read ligne
+do
+if [[ $ligne =~ ^[^d] ]] && [[ $ligne =~ ^[^@] ]]
+then
+	#emier caractère du paquets de droit afin de déterminer si on a un dossier ou un fichier
+	dir=$(echo $ligne | cut -d ' ' -f2 | sed 's/^\(.\).*$/\1/g')
+	#on récupère le gro
+	#on récupère le prupe de droit sans le premier carctère
+	rig=$(echo $ligne | cut -d ' ' -f2 | sed 's/^.\(.*\)/\1/g')
+	#on récupère le nom du fichier
+	name=$(echo $ligne | cut -d ' ' -f1)
+	case $dir in
+		-)#echo "c'est un ficier"
+		#on récupère le caractère marquant le début du contenu dans le body
+		d=$(echo $ligne | cut -d' ' -f4)
+		#on récupère le carctère marquant la longueur du contenu
+		f=$(echo $ligne | cut -d' ' -f5)
+		makefile $rig $name $d $f;;
+		d)#echo "c'est un dossier"
+		makedir $rig $name;;
+		*)echo "gros ton archive est foutu";;
+	esac
+fi
+done < header
+
+
+
