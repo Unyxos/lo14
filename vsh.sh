@@ -29,13 +29,18 @@ function browse {
 		case $userInputCommand in
 			pwd) sendCommand $userInputCommand $directory;;
 			ls) sendCommand $userInputCommand;;
-			#cd) directory=$(sendCommand $userInputCommand $userInputArray $directory);;
 			cd)
 			    if [ -z "$userInputArray"  ]; then
 			        userInputArray="/"
+			        #directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
 			        sendCommand $userInputCommand $archive $userInputArray $directory
 			    else
-                    sendCommand $userInputCommand $archive $userInputArray $directory
+                    if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
+                        #directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
+                        sendCommand $userInputCommand $archive $userInputArray $directory
+                    else
+                        echo "cd: no such file or directory"
+			        fi
 			    fi
 			   ;;
 			cat) sendCommand $userInputCommand $userInputArray;;

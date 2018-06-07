@@ -66,40 +66,51 @@ function commande-pwd {
 }
 
 function commande-cd {
-    local archive asked_dir cur_dir header headerLine fin_header
-    archive=$1
-    asked_dir=$2
-    cur_dir=$3
-    echo "===================================="
-    echo "Asked directory : $asked_dir"
-    echo "Current directory : $cur_dir"
-    echo "Browsed archive : $archive"
-    echo -e "===================================="
-
-    case $asked_dir in
-    /)
-        echo "/"
-       ;;
-    /*)
+    function getHeader {
+        local header fin_header archive
+        archive=$1
         fin_header=$(head -n 1 $archive | cut -d: -f2)
         fin_header=$((fin_header - 1))
         for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
             header="$header$(head -n $i $archive | tail -n+$i)\n"
         done
+        echo -e "$header"
+    }
+    local archive asked_dir cur_dir
+    archive=$1
+    asked_dir=$2
+    cur_dir=$3
+    #echo "===================================="
+    #echo "Asked directory : $asked_dir"
+    #echo "Current directory : $cur_dir"
+    #echo "Browsed archive : $archive"
+    #echo "===================================="
 
-        echo $header |grep "^directory $asked_dir$"
-
-        echo -e "===== HEADER ====="
-        echo -e -n "$header"
-        echo -e "=== FIN HEADER ==="
-
-        echo "chemin absolu"
+    case $asked_dir in
+    #Return to root directory
+    /)
+        echo "/"
        ;;
+    #Absolute navigation
+    /*)
+        #Remove the "/" at the beginning so it can be searched in $header
+        asked_dir=${asked_dir:1}
+
+        header=getHeader $archive
+
+        if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir$") ]]; then
+            echo "/$asked_dir"
+        else
+            echo ""
+        fi
+       ;;
+    #Going backwards
     ..*)
         echo "retour en arrière"
        ;;
+    #Relative navigation
     *)
-        echo "on avance"
+
        ;;
     esac
 }
