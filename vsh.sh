@@ -4,9 +4,10 @@
 #     Déclaration des fonctions     #
 #####################################
 
-# Envoi un message au serveur et affiche la réponse ligne par ligne jusqu'à recontrer le texte "ENDRESPONSE"
-function sendMessage {
-	local line msg
+# Envoi une commande au serveur et affiche la réponse ligne par ligne jusqu'à recontrer le texte "ENDRESPONSE"
+function sendCommand {
+	local line
+	local msg
 	while read line; do
 		if [[ $line == "ENDRESPONSE" ]]; then
 			break
@@ -26,13 +27,21 @@ function browse {
 		userInputCommand=${userInputArray[0]}
 		userInputArray=("${userInputArray[@]:1}")
 		case $userInputCommand in
-			pwd) sendMessage $userInputCommand $directory;;
-			ls) sendMessage $userInputCommand;;
-			#cd) directory=$(sendMessage $userInputCommand $userInputArray $directory);;
-			cd) sendMessage $userInputCommand $userInputArray $directory;;
-			cat) sendMessage $userInputCommand $userInputArray;;
-			rm) sendMessage $userInputCommand $userInputArray;;
-			help) sendMessage $userInputCommand;;
+			pwd) sendCommand $userInputCommand $directory;;
+			ls) sendCommand $userInputCommand;;
+			#cd) directory=$(sendCommand $userInputCommand $userInputArray $directory);;
+			cd)
+			    if [ -z "$userInputArray"  ]; then
+			        userInputArray="/"
+			        sendCommand $userInputCommand $archive $userInputArray $directory
+			    else
+                    sendCommand $userInputCommand $archive $userInputArray $directory
+			    fi
+			   ;;
+			cat) sendCommand $userInputCommand $userInputArray;;
+			rm) sendCommand $userInputCommand $userInputArray;;
+			help) sendCommand $userInputCommand;;
+			stop) sendCommand $userInputCommand;;
 			quit) ;;
 			*) echo -e "\e[91mUnknown command, please try another command or type \e[3m\e[1mhelp\e[0m\e[91m to get a list of commands and their usage.\e[39m"
 		esac
@@ -46,7 +55,7 @@ function browse {
 # Fonction permettant l'extraction
 function extract {
 	#echo "extracting $archive !"
-	sendMessage "extract" $archive > $archive.temp
+	sendCommand "extract" $archive > $archive.temp
 
 	extract_dir=${archive::-5}
 	base_folder=$(pwd)
@@ -256,7 +265,7 @@ function extract {
 
 # Fonction permettant d'envoyer un message au serveur, lui demandant de retourner les archives présesntes
 function list {
-	sendMessage "list"
+	sendCommand "list"
 }
 
 # Fonction affichant simplement comment utiliser la commande, à compléter
