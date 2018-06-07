@@ -1,6 +1,0 @@
-#!/bin/bash
-list=ls $HOME
-for f in $HOME
-do
-echo "$f"
-done
