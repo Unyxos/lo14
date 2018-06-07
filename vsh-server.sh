@@ -1,43 +1,44 @@
 #! /bin/bash
 
-# Ce script implémente un serveur.  
-# Le script doit être invoqué avec l'argument :                                                              
-# PORT   le port sur lequel le serveur attend ses clients  
+# Ce script implÃ©mente un serveur.
+# Le script doit Ãªtre invoquÃ© avec l'argument :
+# PORT   le port sur lequel le serveur attend ses clients
 if [ $# -ne 2 ]; then
     echo -e "usage: $(basename $0) <port> <chemin vers les archives>\nExemple : $(basename $0) 1337 /home/test"
     exit -1
 fi
+
 PORT="$1"
 
-# Déclaration du tube
+# DÃ©claration du tube
 FIFO="/tmp/$USER-fifo-$$"
 
 
-# Il faut détruire le tube quand le serveur termine pour éviter de
-# polluer /tmp.  On utilise pour cela une instruction trap pour être sur de
-# nettoyer même si le serveur est interrompu par un signal.
+# Il faut dÃ©truire le tube quand le serveur termine pour Ã©viter de
+# polluer /tmp.  On utilise pour cela une instruction trap pour Ãªtre sur de
+# nettoyer mÃªme si le serveur est interrompu par un signal.
 function nettoyage() { rm -f "$FIFO"; }
 trap nettoyage EXIT
 
-# on crée le tube nommé
+# on crÃ©e le tube nommÃ©
 [ -e "$FIFO" ] || mkfifo "$FIFO"
 
 function accept-loop() {
     while true; do
-        interaction < "$FIFO" | netcat -l -k -v -p "$PORT" > "$FIFO"
+        interaction < "$FIFO" | netcat -l -k -p "$PORT" > "$FIFO"
     done
 }
 
-# La fonction interaction lit les commandes du client sur entrée standard 
-# et envoie les réponses sur sa sortie standard. 
+# La fonction interaction lit les commandes du client sur entrÃ©e standard
+# et envoie les rÃ©ponses sur sa sortie standard.
 #
-#   CMD arg1 arg2 ... argn                   
-#                     
+#   CMD arg1 arg2 ... argn
+#
 # alors elle invoque la fonction :
-#                                                                            
-#         commande-CMD arg1 arg2 ... argn                                      
-#                                                                              
-# si elle existe; sinon elle envoie une réponse d'erreur.                     
+#
+#         commande-CMD arg1 arg2 ... argn
+#
+# si elle existe; sinon elle envoie une rÃ©ponse d'erreur.
 function interaction() {
     local cmd args
     while true; do
@@ -53,20 +54,54 @@ function interaction() {
     done
 }
 
-# Les fonctions implémentant les différentes commandes du serveur
+# Les fonctions implÃ©mentant les diffÃ©rentes commandes du serveur
 function commande-non-comprise () {
     echo "Le serveur ne peut pas interpreter cette commande"
 }
 
 # Fonctions pour le mode "browse"
-#Affiche le répertoire courant
+#Affiche le rÃ©pertoire courant
 function commande-pwd {
     echo "$1"
 }
 
 function commande-cd {
-    echo 'cd: not working yet!'
-    echo "lol"
+    local archive asked_dir cur_dir header headerLine fin_header
+    archive=$1
+    asked_dir=$2
+    cur_dir=$3
+    echo "===================================="
+    echo "Asked directory : $asked_dir"
+    echo "Current directory : $cur_dir"
+    echo "Browsed archive : $archive"
+    echo -e "===================================="
+
+    case $asked_dir in
+    /)
+        echo "/"
+       ;;
+    /*)
+        fin_header=$(head -n 1 $archive | cut -d: -f2)
+        fin_header=$((fin_header - 1))
+        for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
+            header="$header$(head -n $i $archive | tail -n+$i)\n"
+        done
+
+        echo $header |grep "^directory $asked_dir$"
+
+        echo -e "===== HEADER ====="
+        echo -e -n "$header"
+        echo -e "=== FIN HEADER ==="
+
+        echo "chemin absolu"
+       ;;
+    ..*)
+        echo "retour en arriÃ¨re"
+       ;;
+    *)
+        echo "on avance"
+       ;;
+    esac
 }
 
 function commande-ls {
@@ -74,6 +109,11 @@ function commande-ls {
     echo $*
 }
 
+function commande-stop {
+    kill -9 $(lsof -t -i:$PORT)
+    kill -9 $$
+    exit 1
+}
 function commande-cat {
     echo 'cat: not working yet!'
 }
@@ -99,7 +139,7 @@ function commande-list {
     ls | grep ".arch"
 }
 
-# Renvoi le contenu du fichier Test.arch (à modifier plus tard!)
+# Renvoi le contenu du fichier Test.arch (Ã  modifier plus tard!)
 function commande-extract {
     echo "$(<$1)"
 }
