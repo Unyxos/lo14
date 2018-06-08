@@ -66,17 +66,7 @@ function commande-pwd {
 }
 
 function commande-cd {
-    function getHeader {
-        local header fin_header archive
-        archive=$1
-        fin_header=$(head -n 1 $archive | cut -d: -f2)
-        fin_header=$((fin_header - 1))
-        for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
-            header="$header$(head -n $i $archive | tail -n+$i)\n"
-        done
-        echo -e "$header"
-    }
-    local archive asked_dir cur_dir
+    local archive asked_dir cur_dir header fin_header archive
     archive=$1
     asked_dir=$2
     cur_dir=$3
@@ -86,8 +76,14 @@ function commande-cd {
     #echo "Browsed archive : $archive"
     #echo "===================================="
 
+    fin_header=$(head -n 1 $archive | cut -d: -f2)
+    fin_header=$((fin_header - 1))
+    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
+        header="$header$(head -n $i $archive | tail -n+$i)\n"
+    done
+
     case $asked_dir in
-    #Return to root directory
+    #Returns to root directory
     /)
         echo "/"
        ;;
@@ -96,21 +92,37 @@ function commande-cd {
         #Remove the "/" at the beginning so it can be searched in $header
         asked_dir=${asked_dir:1}
 
-        header=getHeader $archive
-
-        if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir$") ]]; then
+        if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir/*$") ]]; then
             echo "/$asked_dir"
         else
             echo ""
         fi
        ;;
-    #Going backwards
+    #Relative backward navigation
     ..*)
         echo "retour en arrière"
        ;;
-    #Relative navigation
+    #Relative forward navigation
     *)
-
+        #echo "Current directory : $cur_dir"
+        #echo "Asked directory : $asked_dir"
+        cur_dir=${cur_dir:1}
+        #echo "New Current directory : $cur_dir"
+        if [[ $(echo ${#cur_dir}) -eq 0  ]]; then
+            if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir/*$") ]]; then
+                echo "/$asked_dir"
+            else
+                echo ""
+            fi
+        else
+            #echo "on a du texte encore"
+            #echo "Final search to do : $cur_dir/$asked_dir"
+            if [[ ! -z $(echo -e "$header" |grep "^directory $cur_dir/$asked_dir/*$") ]]; then
+                echo "/$cur_dir/$asked_dir"
+            else
+                echo ""
+            fi
+        fi
        ;;
     esac
 }

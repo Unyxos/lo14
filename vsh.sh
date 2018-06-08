@@ -23,6 +23,7 @@ function browse {
 	directory="/"
 	echo "Connected to server $ipAddress on port $port - Browsing archive $archive."
 	while [[ $userInputCommand != 'quit' ]]; do
+	    #echo "============================================================"
 		read -a userInputArray -p "vsh:$directory> "
 		userInputCommand=${userInputArray[0]}
 		userInputArray=("${userInputArray[@]:1}")
@@ -32,12 +33,12 @@ function browse {
 			cd)
 			    if [ -z "$userInputArray"  ]; then
 			        userInputArray="/"
-			        #directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
-			        sendCommand $userInputCommand $archive $userInputArray $directory
+			        directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
+			        #sendCommand $userInputCommand $archive $userInputArray $directory
 			    else
                     if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
-                        #directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
-                        sendCommand $userInputCommand $archive $userInputArray $directory
+                        directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
+                        #sendCommand $userInputCommand $archive $userInputArray $directory
                     else
                         echo "cd: no such file or directory"
 			        fi

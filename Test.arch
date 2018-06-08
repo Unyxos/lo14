@@ -1,6 +1,6 @@
 3:22
 
-directory test
+directory test/
 A drwxr-xr-x
 B drwxr-xr-x
 toto -rwxr-xr-x 42 1 2
