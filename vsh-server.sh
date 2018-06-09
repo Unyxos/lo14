@@ -66,10 +66,11 @@ function commande-pwd {
 }
 
 function commande-cd {
-    local archive asked_dir cur_dir header fin_header archive
+    local archive asked_dir cur_dir header fin_header archive base_dir
     archive=$1
     asked_dir=$2
     cur_dir=$3
+    base_dir=$(echo $(head -n $(head -n 1 Test.arch |cut -d: -f1) Test.arch |grep -o "\w*/$"))
     #echo "===================================="
     #echo "Asked directory : $asked_dir"
     #echo "Current directory : $cur_dir"
@@ -92,7 +93,7 @@ function commande-cd {
         #Remove the "/" at the beginning so it can be searched in $header
         asked_dir=${asked_dir:1}
 
-        if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir/*$") ]]; then
+        if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$asked_dir/*$") ]]; then
             echo "/$asked_dir"
         else
             echo ""
@@ -100,24 +101,40 @@ function commande-cd {
        ;;
     #Relative backward navigation
     ..*)
-        echo "retour en arrière"
+        local dots_nb paths_to_backward test
+        dots_nb=$(echo $asked_dir |grep -o "\." |wc -l)
+        paths_to_backward=$((dots_nb/2))
+        #echo "On retourne derrière de $paths_to_backward dossier"
+        function double_dots {
+            local slashNumber dirToTest
+            #echo "=== DOUBLE DOTS ==="
+            #echo "$cur_dir"
+            #echo "$base_dir"
+            slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
+            dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
+            if [[ -z $dirToTest ]]; then
+                echo "/"
+            else
+                echo "$dirToTest"
+            fi
+            #echo "=== FIN DD ==="
+        }
+        for i in $(seq 1 $paths_to_backward); do
+            cur_dir=$(double_dots)
+        done
+        echo "$cur_dir"
        ;;
     #Relative forward navigation
     *)
-        #echo "Current directory : $cur_dir"
-        #echo "Asked directory : $asked_dir"
         cur_dir=${cur_dir:1}
-        #echo "New Current directory : $cur_dir"
         if [[ $(echo ${#cur_dir}) -eq 0  ]]; then
-            if [[ ! -z $(echo -e "$header" |grep "^directory $asked_dir/*$") ]]; then
+            if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$asked_dir/*$") ]]; then
                 echo "/$asked_dir"
             else
                 echo ""
             fi
         else
-            #echo "on a du texte encore"
-            #echo "Final search to do : $cur_dir/$asked_dir"
-            if [[ ! -z $(echo -e "$header" |grep "^directory $cur_dir/$asked_dir/*$") ]]; then
+            if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$cur_dir/$asked_dir/*$") ]]; then
                 echo "/$cur_dir/$asked_dir"
             else
                 echo ""
@@ -130,6 +147,7 @@ function commande-cd {
 function commande-ls {
     echo 'ls: not working yet!'
     echo $*
+    #TODO : Commande ls
 }
 
 function commande-stop {
@@ -139,10 +157,12 @@ function commande-stop {
 }
 function commande-cat {
     echo 'cat: not working yet!'
+    #TODO : Commande cat
 }
 
 function commande-rm {
     echo 'rm: not working yet!'
+    #TODO : Commande rm
 }
 
 function commande-help {

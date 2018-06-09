@@ -19,7 +19,7 @@ To launch client on "extract" mode :
 
 # Necessary functions
 	[x] List
-	[ ] Browse
+	[o] Browse
 		[x] pwd
 		[ ] cat
 		[o] cd
