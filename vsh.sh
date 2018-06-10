@@ -21,7 +21,7 @@ function sendCommand {
 # Fonction gérant l'affichage du "shell" vsh, envoi un message au serveur suivant la commande entrée par l'utilisateur
 function browse {
 	directory="/"
-	echo "Connected to server $ipAddress on port $port - Browsing archive $archive."
+	echo -e "Connected to server \e[92m\e[1m$ipAddress\e[0m on port \e[92m\e[1m$port\e[0m - Browsing archive \e[92m\e[1m$archive\e[0m."
 	while [[ $userInputCommand != 'quit' ]]; do
 	    #echo "============================================================"
 		read -a userInputArray -p "vsh:$directory> "
