@@ -71,11 +71,12 @@ function commande-cd {
     asked_dir=$2
     cur_dir=$3
     base_dir=$(echo $(head -n $(head -n 1 Test.arch |cut -d: -f1) Test.arch |grep -o "\w*/$"))
-    #echo "===================================="
-    #echo "Asked directory : $asked_dir"
-    #echo "Current directory : $cur_dir"
-    #echo "Browsed archive : $archive"
-    #echo "===================================="
+
+    function checkAskedDir {
+        if [[ ! -z $(echo "$asked_dir" |grep "/$") ]]; then
+            asked_dir=${asked_dir::-1}
+        fi
+    }
 
     fin_header=$(head -n 1 $archive | cut -d: -f2)
     fin_header=$((fin_header - 1))
@@ -90,6 +91,7 @@ function commande-cd {
        ;;
     #Absolute navigation
     /*)
+        checkAskedDir
         #Remove the "/" at the beginning so it can be searched in $header
         asked_dir=${asked_dir:1}
 
@@ -101,31 +103,64 @@ function commande-cd {
        ;;
     #Relative backward navigation
     ..*)
-        local dots_nb paths_to_backward test
+        #checkAskedDir
+        local dots_nb paths_to_backward test finalDir
         dots_nb=$(echo $asked_dir |grep -o "\." |wc -l)
         paths_to_backward=$((dots_nb/2))
-        #echo "On retourne derrière de $paths_to_backward dossier"
-        function double_dots {
-            local slashNumber dirToTest
-            #echo "=== DOUBLE DOTS ==="
-            #echo "$cur_dir"
-            #echo "$base_dir"
-            slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
-            dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
-            if [[ -z $dirToTest ]]; then
-                echo "/"
-            else
-                echo "$dirToTest"
+
+        # Check if the number of "." is odd or even, if odd, returns nothing to display error to client
+        if (( $dots_nb % 2 )); then
+            echo ""
+        else
+            #echo "On retourne derrière de $paths_to_backward dossier"
+            if [[ -z $(echo $asked_dir |grep "/$") ]]; then
+                asked_dir="$asked_dir/"
             fi
-            #echo "=== FIN DD ==="
-        }
-        for i in $(seq 1 $paths_to_backward); do
-            cur_dir=$(double_dots)
-        done
-        echo "$cur_dir"
+
+            function double_dots {
+                local slashNumber dirToTest
+                slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
+                dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
+                if [[ -z $dirToTest ]]; then
+                    echo "/"
+                else
+                    echo "$dirToTest"
+                fi
+            }
+
+            for i in $(seq 1 $paths_to_backward); do
+                cur_dir=$(double_dots)
+            done
+
+            if [[ -z $(echo $asked_dir |sed 's/\.\.\///g') ]]; then
+                echo "$cur_dir"
+            else
+                asked_dir=$(echo $asked_dir |sed 's/\.\.\///g')
+                asked_dir=${asked_dir::-1}
+                cur_dir=${cur_dir:1}
+                if [[ -z "$cur_dir" ]]; then
+                    #echo "$base_dir$asked_dir"
+                    #echo "/$asked_dir"
+                    if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$asked_dir/*$") ]]; then
+                        echo "/$asked_dir"
+                    else
+                        echo ""
+                    fi
+                else
+                    #echo "$base_dir$cur_dir/$asked_dir"
+                    #echo "/$cur_dir/$asked_dir"
+                    if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$cur_dir/$asked_dir/*$") ]]; then
+                        echo "/$cur_dir/$asked_dir"
+                    else
+                        echo ""
+                    fi
+                fi
+            fi
+        fi
        ;;
     #Relative forward navigation
     *)
+        checkAskedDir
         cur_dir=${cur_dir:1}
         if [[ $(echo ${#cur_dir}) -eq 0  ]]; then
             if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$asked_dir/*$") ]]; then
