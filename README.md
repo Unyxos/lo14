@@ -3,7 +3,7 @@
 # Server side
 
 To launch server :
-`./vsh-server.sh <port> </path/to/archives>`
+`./vsh-server.sh <port> </path/to/archives> &`
 
 # Client side
 
@@ -19,10 +19,14 @@ To launch client on "extract" mode :
 
 # Necessary functions
 	[x] List
-	[ ] Browse
+	[o] Browse
 		[x] pwd
 		[ ] cat
-		[ ] cd
+		[x] cd
+		    [x] Absolute path navigation
+		    [x] Relative path navigation
+		        [x] Forward navigation
+		        [x] Backward navigation
 		[ ] rm
 		[ ] ls
 	[x] Extract
