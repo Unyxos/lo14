@@ -21,9 +21,8 @@ function sendCommand {
 # Fonction gérant l'affichage du "shell" vsh, envoi un message au serveur suivant la commande entrée par l'utilisateur
 function browse {
 	directory="/"
-	echo -e "Connected to server \e[92m\e[1m$ipAddress\e[0m on port \e[92m\e[1m$port\e[0m - Browsing archive \e[92m\e[1m$archive\e[0m."
+	echo -e "Connected to \e[92m\e[1m$ipAddress\e[0m on port \e[92m\e[1m$port\e[0m - Browsing archive \e[92m\e[1m$archive\e[0m."
 	while [[ $userInputCommand != 'quit' ]]; do
-	    #echo "============================================================"
 		read -a userInputArray -p "vsh:$directory> "
 		userInputCommand=${userInputArray[0]}
 		userInputArray=("${userInputArray[@]:1}")
@@ -31,23 +30,28 @@ function browse {
 			pwd) sendCommand $userInputCommand $directory;;
 			ls) sendCommand $userInputCommand;;
 			cd)
-			    if [ -z "$userInputArray"  ]; then
+			    if [ -z "$userInputArray" ]; then
 			        userInputArray="/"
 			        directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
-			        #sendCommand $userInputCommand $archive $userInputArray $directory
 			    else
                     if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
                         directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
-                        #sendCommand $userInputCommand $archive $userInputArray $directory
                     else
                         echo "cd: no such file or directory"
 			        fi
 			    fi
 			   ;;
-			cat) sendCommand $userInputCommand $userInputArray;;
-			rm) sendCommand $userInputCommand $userInputArray;;
-			help) sendCommand $userInputCommand;;
-			stop) sendCommand $userInputCommand;;
+			cat)
+			    #sendCommand $userInputCommand $archive $userInputArray $directory
+                if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
+                    sendCommand $userInputCommand $archive $userInputArray $directory
+                else
+                    echo "cat: no such file or directory"
+			    fi
+			   ;;
+			rm) sendCommand $userInputCommand $archive $userInputArray $directory;;
+			help) sendCommand $userInputCommand $archive;;
+			stop) sendCommand $userInputCommand $archive;;
 			quit) ;;
 			*) echo -e "\e[91mUnknown command, please try another command or type \e[3m\e[1mhelp\e[0m\e[91m to get a list of commands and their usage.\e[39m"
 		esac
@@ -230,7 +234,7 @@ function extract {
 				done
 				
 				cd ..
-				echo "str : $str"
+				#echo "str : $str"
 				str=""
 			fi
 			
@@ -256,7 +260,7 @@ function extract {
 					active_dir=$(echo $active_dir | sed 's/\(.*\).$/\1/')
 				fi
 				
-				echo "dir : $active_dir"
+				#echo "dir : $active_dir"
 				changement="true"
 				#echo $changement
 			fi
