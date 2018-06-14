@@ -157,7 +157,7 @@ function relative_backward_path {
 
 function relative_forward_path {
     # Verifies if $asked_dir starts with a /, if not, we add it
-    if [ ${asked_dir:0:1} != "/" ]; then
+    if [[ ${asked_dir:0:1} != "/" ]]; then
         asked_dir="/$asked_dir"
     fi
 
@@ -257,9 +257,12 @@ function commande-cat {
     # all the content.
     base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
 
+    if [[ -z $(echo "$asked_file" |grep "/") ]]; then
+        file_dir="$cur_dir"
+    fi
+
     if [ ${asked_file:0:1} != "/" -a ${asked_file:0:3} != "../" ]; then
-        #echo "pas de / ou de ../"
-        file_dir="${cur_dir:1}/"
+        file_dir="${cur_dir:1}"
     fi
 
     if [[ ! -z $(echo $asked_file |grep "/") ]]; then
@@ -268,8 +271,6 @@ function commande-cat {
         nb_slash=$(($nb_slash + 1))
         asked_file=$(echo "$asked_file" | cut -d "/" -f$nb_slash)
         file_dir=${file_dir::-${#asked_file}}
-    else
-        file_dir="$cur_dir"
     fi
 
     # Stores all archive header's content in a $header variable used to perform tests
@@ -287,31 +288,103 @@ function commande-cat {
         body="$body$(head -n $i $archive | tail -n+$i)\n"
     done
 
-    case $file_dir in
-    # Absolute navigation
-    /*)
+    if [[ $file_dir =~ ^[A-Za-z] || $file_dir =~ ^[0-9] || ${#file_dir} == "0" ]]; then
+        echo "forward"
+        if [[ ${#file_dir} == "0" ]]; then
+            file_dir="/"
+        fi
+        echo $file_dir
+        if [[ -z $(relative_forward_path $file_dir) ]]; then
+            local file_infos
+            if [[ "$file_dir" != */ ]]; then
+                file_dir="$file_dir/"
+            fi
+            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
+                file_infos=$(echo -e "$header" |grep "$asked_file ")
+                if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
+                    local file_start file_length file_content
+                    file_start=$(echo "$file_infos" | cut -d " " -f4)
+                    file_length=$(echo "$file_infos" | cut -d " " -f5)
+                    if [[ "$file_length" < "1" ]]; then
+                        file_end=$(($file_start+$file_length))
+                    else
+                        file_end=$(($file_start+$file_length-1))
+                    fi
+                    for j in `seq $file_start $file_end`; do
+                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                    done
+                    echo -ne "$file_content"
+                else
+                    echo "cat: $asked_file: Is a directory"
+                fi
+            else
+                echo "else 2"
+            fi
+        else
+            echo "else 1"
+        fi
+    elif [ ${file_dir:0:1} == "/" ]; then
+        echo "absolute"
         if [[ -z $(absolute_path $file_dir) ]]; then
-            echo "lol"
             local file_infos
             file_dir=${file_dir:1}
-            echo $base_dir$file_dir
-            #header=$(echo -e "$header" |sed "0,/^directory ${base_dir//\//\\/}${file_dir//\//\\/}\/*$/d" |sed "/\@/q" |sed "/\@/d")
             header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
-            echo -e "$header"
+            if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
+                file_infos=$(echo -e "$header" |grep "$asked_file ")
+                if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
+                    local file_start file_length file_content
+                    file_start=$(echo "$file_infos" | cut -d " " -f4)
+                    file_length=$(echo "$file_infos" | cut -d " " -f5)
+                    if [[ "$file_length" < "1" ]]; then
+                        file_end=$(($file_start+$file_length))
+                    else
+                        file_end=$(($file_start+$file_length-1))
+                    fi
+                    for j in `seq $file_start $file_end`; do
+                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                    done
+                    echo -ne "$file_content"
+                else
+                    echo "cat: $asked_file: Is a directory"
+                fi
+            else
+                echo "else 2"
+            fi
         else
-            echo ""
+            echo "else 1"
         fi
-       ;;
-
-    # Relative backward navigation
-    ..*)
-        echo "non"
-       ;;
-    #Relative forward navigation
-    *)
-        echo "non"
-       ;;
-    esac
+    elif [ ${file_dir:0:3} == "../" ]; then
+        echo "backward"
+        if [[ -z $(relative_backward_path $file_dir) ]]; then
+            local file_infos
+            file_dir=${file_dir:1}
+            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
+                file_infos=$(echo -e "$header" |grep "$asked_file ")
+                if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
+                    local file_start file_length file_content
+                    file_start=$(echo "$file_infos" | cut -d " " -f4)
+                    file_length=$(echo "$file_infos" | cut -d " " -f5)
+                    if [[ "$file_length" < "1" ]]; then
+                        file_end=$(($file_start+$file_length))
+                    else
+                        file_end=$(($file_start+$file_length-1))
+                    fi
+                    for j in `seq $file_start $file_end`; do
+                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                    done
+                    echo -ne "$file_content"
+                else
+                    echo "cat: $asked_file: Is a directory"
+                fi
+            else
+                echo "else 2"
+            fi
+        else
+            echo "else 1"
+        fi
+    fi
 }
 
 # Removes specified file(s) and directory(ies)

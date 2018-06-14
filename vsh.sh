@@ -43,10 +43,10 @@ function browse {
 			   ;;
 			cat)
 			    #sendCommand $userInputCommand $archive $userInputArray $directory
-                if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
-                    sendCommand $userInputCommand $archive $userInputArray $directory
+                if [[ ${#userInputArray} == "0" ]]; then
+                    echo "Please specify a file to display"
                 else
-                    echo "cat: no such file or directory"
+                    sendCommand $userInputCommand $archive $userInputArray $directory
 			    fi
 			   ;;
 			rm) sendCommand $userInputCommand $archive $userInputArray $directory;;
