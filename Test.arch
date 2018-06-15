@@ -1,4 +1,4 @@
-3:22
+3:23
 
 directory test/
 A drwxr-xr-x
@@ -15,6 +15,7 @@ directory test/B
 B1 drwxr-xr-x
 tete -rwxr-xr-x 42 9 3
 tyty -rw-r--r-- 42 12 3
+tata -rw-r--r-- 0
 @
 directory test/B/B1
 caca -rw-r--r-- 42 15 1
