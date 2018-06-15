@@ -70,11 +70,12 @@ function commande-pwd {
 }
 
 function absolute_path {
+    local asked_dir
+    asked_dir=$1
     # Checks if specified path ends with a "/", if it does, we simply remove it
     if [[ ! -z $(echo "$asked_dir" |grep "/$") ]]; then
         asked_dir=${asked_dir::-1}
     fi
-    asked_dir=$1
     #Remove the "/" at the beginning so it can be searched in $header
     asked_dir=${asked_dir:1}
 
@@ -88,7 +89,7 @@ function absolute_path {
 }
 
 function relative_backward_path {
-    local dots_nb paths_to_backward test finalDir
+    local dots_nb paths_to_backward test asked_dir
     asked_dir=$1
     dots_nb=$(echo $asked_dir |grep -o "\." |wc -l)
     paths_to_backward=$((dots_nb/2))
@@ -102,9 +103,7 @@ function relative_backward_path {
             asked_dir="$asked_dir/"
         fi
 
-        # When I wrote this, only God and I understood what I was doing
-        # Now, God only knows
-        # TODO: retrouver l'utilité de cette fonction
+        # Removes "../" everytime the function is called and returns or /, or the new directory
         function double_dots {
             local slashNumber dirToTest
             slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
@@ -116,8 +115,7 @@ function relative_backward_path {
             fi
         }
 
-        # Defines $cur_dir on something that must be useful.. let's try to guess what
-        # TODO: cf todo plus haut
+        # Defines $cur_dir on double_dots() result
         for i in $(seq 1 $paths_to_backward); do
             cur_dir=$(double_dots)
         done
@@ -156,8 +154,11 @@ function relative_backward_path {
 }
 
 function relative_forward_path {
+    local asked_dir
+    asked_dir=$1
+
     # Verifies if $asked_dir starts with a /, if not, we add it
-    if [[ ${asked_dir:0:1} != "/" ]]; then
+    if [[ ${asked_dir:0:1} == "/" ]]; then
         asked_dir="/$asked_dir"
     fi
 
@@ -166,7 +167,6 @@ function relative_forward_path {
         asked_dir=${asked_dir::-1}
     fi
 
-    asked_dir=$1
     cur_dir=${cur_dir:1}
     # Checks if $cur_dir's length is equal to 0, if it is, performs a check based on $base_dir and $asked_dir.
     if [[ $(echo ${#cur_dir}) -eq 0  ]]; then
@@ -246,7 +246,7 @@ function commande-stop {
 
 # Displays content of specified file
 function commande-cat {
-    local archive asked_file file_dir cur_dir header fin_header archive base_dir nb_slash body_start body body_length
+    local archive asked_file file_dir cur_dir header fin_header archive base_dir nb_slash body_start body body_length modified_file_dir
     local body_length
     archive=$1
     asked_file=$2
@@ -258,13 +258,16 @@ function commande-cat {
     base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
 
     if [[ -z $(echo "$asked_file" |grep "/") ]]; then
-        file_dir="$cur_dir"
+        file_dir="$cur_dir/$file_dir"
+        modified_file_dir="1"
     fi
 
+    # If $asked_file beginning isn't "/" or "../", defines $file_dir on $cur_dir minus it's first character
     if [ ${asked_file:0:1} != "/" -a ${asked_file:0:3} != "../" ]; then
         file_dir="${cur_dir:1}"
     fi
 
+    # If $asked_file contains "/" we separate the resource's directory and the resource's name in 2 variables
     if [[ ! -z $(echo $asked_file |grep "/") ]]; then
         file_dir="$asked_file"
         nb_slash=$(echo "$asked_file" |grep -o "/" |wc -l)
@@ -280,6 +283,7 @@ function commande-cat {
         header="$header$(head -n $i $archive | tail -n+$i)\n"
     done
 
+    # Saves body start line and body end line
     body_start=$(head -n 1 $archive | cut -d: -f2)
     body_end=$(cat $archive | wc -l)
     body_end=$((body_end+1))
@@ -288,101 +292,171 @@ function commande-cat {
         body="$body$(head -n $i $archive | tail -n+$i)\n"
     done
 
+    # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
     if [[ $file_dir =~ ^[A-Za-z] || $file_dir =~ ^[0-9] || ${#file_dir} == "0" ]]; then
-        echo "forward"
         if [[ ${#file_dir} == "0" ]]; then
             file_dir="/"
         fi
-        echo $file_dir
-        if [[ -z $(relative_forward_path $file_dir) ]]; then
+        # Verifies if $cur_dir contains "/" and if $file_dir contains more than 1 "/"
+        if [[ $(echo $cur_dir) =~ ^/$ && $(echo $file_dir |grep -o "/") > 1 ]]; then
+            cur_dir=${cur_dir:1}
+            file_dir="$cur_dir"
+        # Verifies if $modified_file_dir is equal to one or if $cur_dir contains nothing
+        elif [[ "$modified_file_dir" != "1" || ${#cur_dir} == "0" ]]; then
+            cur_dir=${cur_dir:1}
+            file_dir="$cur_dir/$file_dir"
+            # Removes "/" from $file_dir if it exists at the first position
+            if [[ $(echo ${file_dir:0:1}) == "/" ]]; then
+                file_dir=${file_dir:1}
+            fi
+        fi
+        # If $file_dir is just 1 character long or if the function is working we continue our tests further
+        if [[ ${#file_dir} == "1" || ! -z $(relative_forward_path $file_dir) ]]; then
             local file_infos
             if [[ "$file_dir" != */ ]]; then
                 file_dir="$file_dir/"
             fi
             header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            # Verifies is $asked_file exists in the list in $header
             if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
                 file_infos=$(echo -e "$header" |grep "$asked_file ")
+                # Verifies if asked resource is a directory or a file
                 if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
                     local file_start file_length file_content
-                    file_start=$(echo "$file_infos" | cut -d " " -f4)
-                    file_length=$(echo "$file_infos" | cut -d " " -f5)
-                    if [[ "$file_length" < "1" ]]; then
-                        file_end=$(($file_start+$file_length))
+                    # Checks if the file have 4 spaces between it's information, if it does, it contains data
+                    if [[ $(echo "$file_infos" |grep -o " "| wc -l) == "4" ]]; then
+                        file_start=$(echo "$file_infos" | cut -d " " -f4)
+                        file_length=$(echo "$file_infos" | cut -d " " -f5)
+                        if [[ "$file_length" < "1" ]]; then
+                            file_end=$(($file_start+$file_length))
+                        else
+                            file_end=$(($file_start+$file_length-1))
+                        fi
+                        for j in `seq $file_start $file_end`; do
+                            file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                        done
+                        echo -ne "$file_content"
                     else
-                        file_end=$(($file_start+$file_length-1))
+                        echo ""
                     fi
-                    for j in `seq $file_start $file_end`; do
-                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
-                    done
-                    echo -ne "$file_content"
                 else
                     echo "cat: $asked_file: Is a directory"
                 fi
             else
-                echo "else 2"
+                echo "cat: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "cat: no such file or directory"
         fi
+    # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
     elif [ ${file_dir:0:1} == "/" ]; then
-        echo "absolute"
-        if [[ -z $(absolute_path $file_dir) ]]; then
+        # Checks if specified directory exists
+        if [[ ! -z $(absolute_path $file_dir) ]]; then
             local file_infos
             file_dir=${file_dir:1}
+            # Gets all content of $file_dir repertory
             header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            # Checks if $asked_file exists in the list stored in $header
             if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
                 file_infos=$(echo -e "$header" |grep "$asked_file ")
+                # Verifies if asked resource is a directory or a file
                 if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
                     local file_start file_length file_content
-                    file_start=$(echo "$file_infos" | cut -d " " -f4)
-                    file_length=$(echo "$file_infos" | cut -d " " -f5)
-                    if [[ "$file_length" < "1" ]]; then
-                        file_end=$(($file_start+$file_length))
+                    # Checks if the file have 4 spaces between it's information, if it does, it contains data
+                    if [[ $(echo "$file_infos" |grep -o " "| wc -l) == "4" ]]; then
+                        file_start=$(echo "$file_infos" | cut -d " " -f4)
+                        file_length=$(echo "$file_infos" | cut -d " " -f5)
+                        if [[ "$file_length" < "1" ]]; then
+                            file_end=$(($file_start+$file_length))
+                        else
+                            file_end=$(($file_start+$file_length-1))
+                        fi
+                        for j in `seq $file_start $file_end`; do
+                            file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                        done
+                        echo -ne "$file_content"
+                    # If not, returns nothing
                     else
-                        file_end=$(($file_start+$file_length-1))
+                        echo ""
                     fi
-                    for j in `seq $file_start $file_end`; do
-                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
-                    done
-                    echo -ne "$file_content"
                 else
                     echo "cat: $asked_file: Is a directory"
                 fi
             else
-                echo "else 2"
+                echo "cat: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "cat: no such file or directory"
         fi
+    # Checks if first 3 chars from file_dir are "../", if yes, go through relative backward "navigation"
     elif [ ${file_dir:0:3} == "../" ]; then
-        echo "backward"
-        if [[ -z $(relative_backward_path $file_dir) ]]; then
+        dots_nb=$(echo $file_dir |grep -o "\." |wc -l)
+        paths_to_backward=$((dots_nb/2))
+
+        # Removes "../" everytime the function is called and returns or /, or the new directory
+        function double_dots_cat {
+            local slashNumber dirToTest
+            slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
+            dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
+            if [[ -z $dirToTest ]]; then
+                echo "/"
+            else
+                echo "$dirToTest"
+            fi
+        }
+
+        # Defines $cur_dir on double_dots_cats() result
+        for i in $(seq 1 $paths_to_backward); do
+            cur_dir=$(double_dots_cat)
+        done
+        cur_dir=${cur_dir:1}
+        # Checks if directory exists
+        if [[ ! -z $(relative_backward_path $cur_dir) ]]; then
             local file_infos
-            file_dir=${file_dir:1}
-            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            # Checks if the file contains only "../", if it does, user won't go further in folders and we verify using $cur_dir
+            if [[ -z $(echo $file_dir |sed 's/\.\.\///g') ]]; then
+                header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $cur_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            # If it doesn't, check if asked path exists
+            else
+                local remain_dir
+                # Removes all "../" and last "/" from $file_dir and contains it in $remain_dir
+                remain_dir=${file_dir//..\//}
+                remain_dir=${remain_dir::-1}
+                header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $remain_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            fi
+            # Verifies is $asked_file exists in the list in $header
             if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
                 file_infos=$(echo -e "$header" |grep "$asked_file ")
+                # Verifies if asked resource is a directory or a file
                 if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
                     local file_start file_length file_content
-                    file_start=$(echo "$file_infos" | cut -d " " -f4)
-                    file_length=$(echo "$file_infos" | cut -d " " -f5)
-                    if [[ "$file_length" < "1" ]]; then
-                        file_end=$(($file_start+$file_length))
+                    # Checks if the file have 4 spaces between it's information, if it does, it contains data
+                    if [[ $(echo "$file_infos" |grep -o " "| wc -l) == "4" ]]; then
+                        # Iterates in body to get all file's content
+                        file_start=$(echo "$file_infos" | cut -d " " -f4)
+                        file_length=$(echo "$file_infos" | cut -d " " -f5)
+                        if [[ "$file_length" < "1" ]]; then
+                            file_end=$(($file_start+$file_length))
+                        else
+                            file_end=$(($file_start+$file_length-1))
+                        fi
+                        for j in `seq $file_start $file_end`; do
+                            file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
+                        done
+                        # Prints content
+                        echo -ne "$file_content"
+                    # If not, returns nothing
                     else
-                        file_end=$(($file_start+$file_length-1))
+                        echo ""
                     fi
-                    for j in `seq $file_start $file_end`; do
-                        file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
-                    done
-                    echo -ne "$file_content"
                 else
                     echo "cat: $asked_file: Is a directory"
                 fi
             else
-                echo "else 2"
+                echo "cat: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "cat: no such file or directory"
         fi
     fi
 }

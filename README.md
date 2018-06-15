@@ -21,7 +21,7 @@ To launch client on "extract" mode :
 	[x] List
 	[o] Browse
 		[x] pwd
-		[ ] cat
+		[x] cat
 		[x] cd
 		    [x] Absolute path navigation
 		    [x] Relative path navigation

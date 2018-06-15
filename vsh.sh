@@ -36,7 +36,7 @@ function browse {
 			    else
                     if [[ ! -z $(sendCommand $userInputCommand $archive $userInputArray $directory) ]]; then
                         directory=$(sendCommand $userInputCommand $archive $userInputArray $directory)
-                    else
+			        else
                         echo "cd: no such file or directory"
 			        fi
 			    fi
@@ -218,7 +218,6 @@ function extract {
 				
 				for i in $str
 				do
-				
 					if [ -f $i ]
 					then
 						echo $i
