@@ -28,7 +28,14 @@ function browse {
 		userInputArray=("${userInputArray[@]:1}")
 		case $userInputCommand in
 			pwd) sendCommand $userInputCommand $directory;;
-			ls) sendCommand $userInputCommand;;
+			ls)
+			    if [ -z "$userInputArray" ]; then
+                    userInputArray="$directory"
+                    sendCommand $userInputCommand $archive $userInputArray $directory
+			    else
+                    sendCommand $userInputCommand $archive $userInputArray $directory
+			    fi
+			    ;;
 			cd)
 			    if [ -z "$userInputArray" ]; then
 			        userInputArray="/"

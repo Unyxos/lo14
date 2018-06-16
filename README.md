@@ -22,11 +22,23 @@ To launch client on "extract" mode :
 	[o] Browse
 		[x] pwd
 		[x] cat
+		    [x] Absolute
+		    [x] Relative
+		        [x] Forward
+		        [x] Backward
 		[x] cd
 		    [x] Absolute path navigation
 		    [x] Relative path navigation
 		        [x] Forward navigation
 		        [x] Backward navigation
 		[ ] rm
-		[ ] ls
+		    [ ] Absolute
+		    [ ] Relative
+		        [ ] Forward
+		        [ ] Backward
+		[x] ls
+		    [x] Absolute
+		    [x] Relative
+		        [x] Forward
+		        [x] Backward
 	[x] Extract

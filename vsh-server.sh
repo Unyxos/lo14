@@ -189,6 +189,31 @@ function relative_forward_path {
     fi
 }
 
+function getHeader {
+    local archive fin_header header
+    archive=$1
+    # Stores all archive header's content in a $header variable used to perform tests
+    fin_header=$(head -n 1 $archive | cut -d: -f2)
+    fin_header=$((fin_header - 1))
+    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
+        header="$header$(head -n $i $archive | tail -n+$i)\n"
+    done
+    echo -e "$header"
+}
+
+function getBody {
+    local archive body_start body_end body
+    archive=$1
+    # Saves body start line and body end line
+    body_start=$(head -n 1 $archive | cut -d: -f2)
+    body_end=$(cat $archive | wc -l)
+    body_end=$((body_end+1))
+    for i in `seq $body_start $body_end`; do
+        body="$body$(head -n $i $archive | tail -n+$i)\n"
+    done
+    echo -e "$body"
+}
+
 # Handles navigation in the archive using both relative and absolute paths
 function commande-cd {
     local archive asked_dir cur_dir header fin_header archive base_dir
@@ -202,11 +227,7 @@ function commande-cd {
     base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
 
     # Stores all archive header's content in a $header variable used to perform tests
-    fin_header=$(head -n 1 $archive | cut -d: -f2)
-    fin_header=$((fin_header - 1))
-    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
-        header="$header$(head -n $i $archive | tail -n+$i)\n"
-    done
+    header=$(getHeader $archive)
 
     case $asked_dir in
     # Returns to root directory
@@ -232,9 +253,121 @@ function commande-cd {
 
 # Displays content of current directory by default or specified directory if entered, on client side
 function commande-ls {
-    echo 'ls: not working yet!'
-    echo $*
-    #TODO : Commande ls
+    local archive asked_dir header fin_header archive base_dir nb_slash body_start body body_length modified_file_dir cur_dir header base_dir
+    local body_length content_list lines_number
+    archive=$1
+    asked_dir=$2
+    cur_dir=$3
+    header=$(getHeader $archive)
+
+    function getContentList {
+        lines_number=$(echo -e "$header" |wc -l)
+        for i in `seq "1" $lines_number`; do
+            # If the file rights contains a "d" it's a folder
+            if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "d") ]]; then
+                #echo "directory"
+                content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)/ "
+            else
+                #echo "not directory"
+                if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "x") ]]; then
+                    #echo "can be executed"
+                    content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)* "
+                else
+                    #echo "can't be executed"
+                    content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1) "
+                fi
+            fi
+        done
+
+        echo -e "$content_list"
+    }
+
+    base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
+
+    # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
+    if [[ $asked_dir =~ ^[A-Za-z] || $asked_dir =~ ^[0-9] || ${#asked_dir} == "0" ]]; then
+        if [[ ${#asked_dir} == "0" ]]; then
+            file_dir="/"
+        fi
+        # Verifies if $cur_dir contains "/" and if $file_dir contains more than 1 "/"
+        if [[ $(echo $cur_dir) =~ ^/$ && $(echo $asked_dir |grep -o "/") > 1 ]]; then
+            cur_dir=${cur_dir:1}
+            asked_dir="$cur_dir"
+        # Verifies if $modified_file_dir is equal to one or if $cur_dir contains nothing
+        elif [[ "$modified_file_dir" != "1" || ${#cur_dir} == "0" ]]; then
+            cur_dir=${cur_dir:1}
+            asked_dir="$cur_dir/$asked_dir"
+            # Removes "/" from $file_dir if it exists at the first position
+            if [[ $(echo ${asked_dir:0:1}) == "/" ]]; then
+                asked_dir=${asked_dir:1}
+            fi
+        fi
+        # If $file_dir is just 1 character long or if the function is working we continue our tests further
+        if [[ ${#asked_dir} == "1" || ! -z $(relative_forward_path $asked_dir) ]]; then
+            local file_infos
+            if [[ "$asked_dir" != */ ]]; then
+                asked_dir="$asked_dir/"
+            fi
+            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $asked_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            getContentList
+        else
+            echo "ls: no such file or directory"
+        fi
+    # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
+    elif [ ${asked_dir:0:1} == "/" ]; then
+        # Checks if specified directory exists
+        if [[ ${#asked_dir} == "1" && "$asked_dir" == "/" ]]; then
+            asked_dir=""
+        fi
+        if [[ ! -z $(absolute_path $asked_dir) ]]; then
+            local file_infos
+            asked_dir=${asked_dir:1}
+            # Gets all content of $file_dir repertory
+            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $asked_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
+            getContentList
+        else
+            echo "ls: no such file or directory"
+        fi
+    # Checks if first 3 chars from file_dir are "../", if yes, go through relative backward "navigation"
+    elif [ ${asked_dir:0:3} == "../" ]; then
+        dots_nb=$(echo $asked_dir |grep -o "\." |wc -l)
+        paths_to_backward=$((dots_nb/2))
+
+        # Removes "../" everytime the function is called and returns or /, or the new directory
+        function double_dots_ls {
+            local slashNumber dirToTest
+            slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
+            dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
+            if [[ -z $dirToTest ]]; then
+                echo "/"
+            else
+                echo "$dirToTest"
+            fi
+        }
+
+        # Defines $cur_dir on double_dots_cats() result
+        for i in $(seq 1 $paths_to_backward); do
+            cur_dir=$(double_dots_ls)
+        done
+        cur_dir=${cur_dir:1}
+        # Checks if directory exists
+        if [[ ! -z $(relative_backward_path $cur_dir) ]]; then
+            local file_infos
+            # Checks if the file contains only "../", if it does, user won't go further in folders and we verify using $cur_dir
+            if [[ -z $(echo $asked_dir |sed 's/\.\.\///g') ]]; then
+                header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $cur_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            # If it doesn't, check if asked path exists
+            else
+                local remain_dir
+                # Removes all "../" and last "/" from $asked and contains it in $remain_dir
+                remain_dir=${asked_dir//..\//}
+                header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $remain_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            fi
+            getContentList
+        else
+            echo "ls: no such file or directory"
+        fi
+    fi
 }
 
 # Stops the server
@@ -276,21 +409,9 @@ function commande-cat {
         file_dir=${file_dir::-${#asked_file}}
     fi
 
-    # Stores all archive header's content in a $header variable used to perform tests
-    fin_header=$(head -n 1 $archive | cut -d: -f2)
-    fin_header=$((fin_header - 1))
-    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
-        header="$header$(head -n $i $archive | tail -n+$i)\n"
-    done
+    header=$(getHeader $archive)
 
-    # Saves body start line and body end line
-    body_start=$(head -n 1 $archive | cut -d: -f2)
-    body_end=$(cat $archive | wc -l)
-    body_end=$((body_end+1))
-
-    for i in `seq $body_start $body_end`; do
-        body="$body$(head -n $i $archive | tail -n+$i)\n"
-    done
+    body=$(getBody $archive)
 
     # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
     if [[ $file_dir =~ ^[A-Za-z] || $file_dir =~ ^[0-9] || ${#file_dir} == "0" ]]; then
@@ -311,7 +432,7 @@ function commande-cat {
             fi
         fi
         # If $file_dir is just 1 character long or if the function is working we continue our tests further
-        if [[ ${#file_dir} == "1" || ! -z $(relative_forward_path $file_dir) ]]; then
+        if [[ ${#file_dir} == "1" || -z $(relative_forward_path $file_dir) ]]; then
             local file_infos
             if [[ "$file_dir" != */ ]]; then
                 file_dir="$file_dir/"
@@ -343,10 +464,10 @@ function commande-cat {
                     echo "cat: $asked_file: Is a directory"
                 fi
             else
-                echo "cat: no such file or directory"
+                echo "else 2"
             fi
         else
-            echo "cat: no such file or directory"
+            echo "else 1"
         fi
     # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
     elif [ ${file_dir:0:1} == "/" ]; then
@@ -473,7 +594,7 @@ function commande-help {
     echo ""
     echo -e "  cat         <filename>               Display content of a file"
     echo -e "  cd          <path_to_directory>      Move to the specified directory"
-    echo -e "  ls     [-l]                          List files and folders in the current directory"
+    echo -e "  ls                                   List files and folders in the current directory"
     echo -e "  pwd                                  Display absolute path to current directory"
     echo -e "  quit                                 Exit VSH client"
     echo -e "  rm     [-r] <filename_or_dirname>    Remove specified folder(s) or file(s)"
