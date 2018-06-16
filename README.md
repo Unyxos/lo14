@@ -32,9 +32,13 @@ To launch client on "extract" mode :
 		        [x] Forward navigation
 		        [x] Backward navigation
 		[ ] rm
+		    [ ] Absolute
+		    [ ] Relative
+		        [ ] Forward
+		        [ ] Backward
 		[ ] ls
 		    [x] Absolute
 		    [o] Relative
-		        [o] Forward
+		        [x] Forward
 		        [ ] Backward
 	[x] Extract

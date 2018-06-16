@@ -259,66 +259,57 @@ function commande-ls {
     asked_dir=$2
     cur_dir=$3
     header=$(getHeader $archive)
-    #echo "===================================="
-    #echo "Archive : $archive, Asked directory : $asked_dir, Current directory : $cur_dir"
-    #echo "===================================="
+
+    function getContentList {
+        lines_number=$(echo -e "$header" |wc -l)
+        for i in `seq "1" $lines_number`; do
+            # If the file rights contains a "d" it's a folder
+            if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "d") ]]; then
+                #echo "directory"
+                content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)/ "
+            else
+                #echo "not directory"
+                if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "x") ]]; then
+                    #echo "can be executed"
+                    content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)* "
+                else
+                    #echo "can't be executed"
+                    content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1) "
+                fi
+            fi
+        done
+
+        echo -e "$content_list"
+    }
 
     base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
 
     # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
     if [[ $asked_dir =~ ^[A-Za-z] || $asked_dir =~ ^[0-9] || ${#asked_dir} == "0" ]]; then
-        echo "relative forward"
         if [[ ${#asked_dir} == "0" ]]; then
             file_dir="/"
         fi
         # Verifies if $cur_dir contains "/" and if $file_dir contains more than 1 "/"
-        if [[ $(echo $cur_dir) =~ ^/$ && $(echo $file_dir |grep -o "/") > 1 ]]; then
+        if [[ $(echo $cur_dir) =~ ^/$ && $(echo $asked_dir |grep -o "/") > 1 ]]; then
             cur_dir=${cur_dir:1}
-            file_dir="$cur_dir"
+            asked_dir="$cur_dir"
         # Verifies if $modified_file_dir is equal to one or if $cur_dir contains nothing
         elif [[ "$modified_file_dir" != "1" || ${#cur_dir} == "0" ]]; then
             cur_dir=${cur_dir:1}
-            file_dir="$cur_dir/$file_dir"
+            asked_dir="$cur_dir/$asked_dir"
             # Removes "/" from $file_dir if it exists at the first position
-            if [[ $(echo ${file_dir:0:1}) == "/" ]]; then
-                file_dir=${file_dir:1}
+            if [[ $(echo ${asked_dir:0:1}) == "/" ]]; then
+                asked_dir=${asked_dir:1}
             fi
         fi
         # If $file_dir is just 1 character long or if the function is working we continue our tests further
-        if [[ ${#file_dir} == "1" || ! -z $(relative_forward_path $file_dir) ]]; then
+        if [[ ${#asked_dir} == "1" || ! -z $(relative_forward_path $asked_dir) ]]; then
             local file_infos
-            if [[ "$file_dir" != */ ]]; then
-                file_dir="$file_dir/"
+            if [[ "$asked_dir" != */ ]]; then
+                asked_dir="$asked_dir/"
             fi
-            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $file_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
-            # Verifies is $asked_file exists in the list in $header
-            if [[ ! -z $(echo -e "$header" |grep "^$asked_file ") ]]; then
-                file_infos=$(echo -e "$header" |grep "$asked_file ")
-                # Verifies if asked resource is a directory or a file
-                if [[ -z $(echo -e "$file_infos" |cut -d " " -f2 |grep "d") ]]; then
-                    local file_start file_length file_content
-                    # Checks if the file have 4 spaces between it's information, if it does, it contains data
-                    if [[ $(echo "$file_infos" |grep -o " "| wc -l) == "4" ]]; then
-                        file_start=$(echo "$file_infos" | cut -d " " -f4)
-                        file_length=$(echo "$file_infos" | cut -d " " -f5)
-                        if [[ "$file_length" < "1" ]]; then
-                            file_end=$(($file_start+$file_length))
-                        else
-                            file_end=$(($file_start+$file_length-1))
-                        fi
-                        for j in `seq $file_start $file_end`; do
-                            file_content="$file_content$(echo -e "$body" |sed -n "$j"p)\n"
-                        done
-                        echo -ne "$file_content"
-                    else
-                        echo ""
-                    fi
-                else
-                    echo "cat: $asked_file: Is a directory"
-                fi
-            else
-                echo "ls: no such file or directory"
-            fi
+            header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $asked_dir |sed 's/\//\\\//g')*$/d" |sed "/\@/q" |sed "/\@/d")
+            getContentList
         else
             echo "ls: no such file or directory"
         fi
@@ -333,26 +324,7 @@ function commande-ls {
             asked_dir=${asked_dir:1}
             # Gets all content of $file_dir repertory
             header=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $asked_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
-            lines_number=$(echo -e "$header" |wc -l)
-            for i in `seq "1" $lines_number`; do
-                # If the file rights contains a "d" it's a folder
-                if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "d") ]]; then
-                    #echo "directory"
-                    content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)/ "
-                else
-                    #echo "not directory"
-                    if [[ ! -z $(echo -e "$header" |sed -n "$i"p |cut -d " " -f2 |grep "x") ]]; then
-                        #echo "can be executed"
-                        content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1)* "
-                    else
-                        #echo "can't be executed"
-                        content_list="$content_list$(echo -e "$header" |sed -n "$i"p |cut -d " " -f1) "
-                    fi
-                fi
-            done
-
-            echo -e "$content_list"
-
+            getContentList
         else
             echo "ls: no such file or directory"
         fi
