@@ -35,7 +35,7 @@ To launch client on "extract" mode :
 		    [o] Absolute
 		        [x] File
 		        [ ] Directory
-		    [ ] Relative
+		    [o] Relative
 		        [o] Forward
                         [x] File
                         [ ] Directory
