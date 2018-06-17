@@ -24,7 +24,7 @@ function browse {
 	echo -e "Connected to \e[92m\e[1m$ipAddress\e[0m on port \e[92m\e[1m$port\e[0m - Browsing archive \e[92m\e[1m$archive\e[0m."
 	while [[ $userInputCommand != 'quit' ]]; do
 		read -a userInputArray -p "vsh:$directory> "
-		userInputCommand=${userInputArray[0]}
+		userInputCommand="${userInputArray[0]}"
 		userInputArray=("${userInputArray[@]:1}")
 		case $userInputCommand in
 			pwd) sendCommand $userInputCommand $directory;;
@@ -56,7 +56,19 @@ function browse {
                     sendCommand $userInputCommand $archive $userInputArray $directory
 			    fi
 			   ;;
-			rm) sendCommand $userInputCommand $archive $userInputArray $directory;;
+			rm)
+			    if [[ "${#userInputArray[@]}" == "1" ]]; then
+                    sendCommand $userInputCommand $archive $userInputArray $directory
+			    elif [[ "${#userInputArray[@]}" == "2" ]]; then
+			        if [[ "${userInputArray[0]}" == "-r" ]]; then
+                        sendCommand $userInputCommand $archive ${userInputArray[1]} $directory ${userInputArray[0]}
+			        else
+			            echo "invalid mode, please use -r to delete a folder"
+			        fi
+			    else
+                    echo "marche pas comme ça frr"
+			    fi
+			;;
 			help) sendCommand $userInputCommand $archive;;
 			stop) sendCommand $userInputCommand $archive;;
 			quit) ;;
