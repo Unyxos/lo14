@@ -582,10 +582,189 @@ function commande-cat {
     fi
 }
 
-# Removes specified file(s) and directory(ies)
+# Removes specified file or directory
 function commande-rm {
-    echo 'rm: not working yet!'
-    #TODO : Commande rm
+    local archive cur_dir header base_dir nb_slash mode resource_file resource_dir header_file
+    archive=$1
+    asked_resource=$2
+    cur_dir=$3
+    if [[ "$4" == "-r" ]]; then
+        mode="-r"
+    else
+        mode=""
+    fi
+
+    base_dir=$(echo $(head -n $(head -n 1 $archive |cut -d: -f1) $archive |grep -o "\w*/$"))
+
+    header=$(getHeader $archive)
+    body=$(getBody $archive)
+
+    if [[ -z $(echo "$asked_resource" |grep "/") ]]; then
+        resource_dir="$cur_dir/$resource_dir"
+        modified_resource_dir="1"
+    fi
+
+    # If $asked_file beginning isn't "/" or "../", defines $file_dir on $cur_dir minus it's first character
+    if [ ${asked_resource:0:1} != "/" -a ${asked_resource:0:3} != "../" ]; then
+        resource_dir="${cur_dir:1}"
+    fi
+
+    function removeFile {
+        local resource_line dir_line header_before header_after new_header header_line_end directory
+        directory="$1"
+        header_line_end=$(head -n 1 $archive | cut -d: -f2)
+        header_line_end=$((header_line_end-1))
+        resource_line=$(echo -e "$header_file" |grep -n "$asked_resource" |cut -d':' -f1)
+        dir_line=$(echo -e "$header" |grep -n "^directory $base_dir$directory$" |cut -d':' -f1)
+        #Select the part of the header before the line to delete
+		header_before=$(echo -e "$header" | head -n $(($dir_line+$resource_line-1)))
+		#Select the part of the header after the line to delete
+		header_after=$(echo -e "$header" | tail -n $(($(echo -e "$header" | wc -l)-$dir_line-$resource_line)))
+        new_header="$header_before\n$header_after"
+        rm "$archive"
+        echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
+        echo "Deleted $asked_resource"
+    }
+
+    # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
+    if [[ $asked_resource =~ ^[A-Za-z] || $asked_resource =~ ^[0-9] || ${#asked_resource} == "0" ]]; then
+        if [[ ${#resource_dir} == "0" ]]; then
+            resource_dir="/"
+        fi
+        # Verifies if $cur_dir contains "/" and if $file_dir contains more than 1 "/"
+        if [[ $(echo $cur_dir) =~ ^/$ && $(echo $resource_dir |grep -o "/") > 1 ]]; then
+            cur_dir=${cur_dir:1}
+            resource_dir="$cur_dir"
+        # Verifies if $modified_file_dir is equal to one or if $cur_dir contains nothing
+        elif [[ "$modified_resource_dir" != "1" || ${#cur_dir} == "0" ]]; then
+            cur_dir=${cur_dir:1}
+            resource_dir="$cur_dir/$resource_dir"
+        fi
+        # If $file_dir is just 1 character long or if the function is working we continue our tests further
+        if [[ ${#resource_dir} == "1" || -z $(relative_forward_path $resource_dir) ]]; then
+            if [[ "$resource_dir" =~ ^/$ ]]; then
+                resource_dir=""
+            fi
+            header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
+            if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
+                # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
+                local resource_infos
+                resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
+                if [[ "${#mode}" == "0" ]]; then
+                    if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
+                        removeFile "$resource_dir"
+                    else
+                        echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
+                    fi
+                else
+                    echo "folder"
+                fi
+            else
+                echo "else 2"
+            fi
+        else
+            echo "else 1"
+        fi
+    # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
+    elif [ ${asked_resource:0:1} == "/" ]; then
+        resource_dir="$asked_resource"
+        nb_slash=$(echo "$asked_resource" |grep -o "/" |wc -l)
+        nb_slash=$(($nb_slash + 1))
+        asked_resource=$(echo "$asked_resource" | cut -d "/" -f$nb_slash)
+        resource_dir=${resource_dir::-${#asked_resource}}
+
+        if [[ "$resource_dir" =~ ^/$ ]]; then
+            resource_dir=""
+        else
+            resource_dir=${resource_dir:1}
+            resource_dir=${resource_dir::-1}
+        fi
+        # Checks if $resource_dir exists in the header
+        if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$resource_dir/*$") ]]; then
+            if [[ "$resource_dir" =~ ^/$ ]]; then
+                resource_dir=""
+            fi
+            header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
+            # Check if $asked_file exists in $header_file
+            if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
+                # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
+                local resource_infos
+                resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
+                if [[ "${#mode}" == "0" ]]; then
+                    if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
+                        removeFile "$resource_dir"
+                    else
+                        echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
+                    fi
+                else
+                    echo "folder"
+                fi
+            else
+                echo "else 2"
+            fi
+        else
+            echo "else 1"
+        fi
+    # Checks if first 3 chars from file_dir are "../", if yes, go through relative backward "navigation"
+    elif [ ${asked_resource:0:3} == "../" ]; then
+        resource_dir="$asked_resource"
+        nb_slash=$(echo "$asked_resource" |grep -o "/" |wc -l)
+        nb_slash=$(($nb_slash + 1))
+        asked_resource=$(echo "$asked_resource" | cut -d "/" -f$nb_slash)
+        resource_dir=${resource_dir::-${#asked_resource}}
+
+        dots_nb=$(echo $resource_dir |grep -o "\." |wc -l)
+        paths_to_backward=$((dots_nb/2))
+
+        # Removes "../" everytime the function is called and returns or /, or the new directory
+        function double_dots_rm {
+            local slashNumber dirToTest
+            slashNumber=$(echo $cur_dir |grep -o "/" |wc -l)
+            dirToTest="$(echo "$cur_dir" | cut -d/ -f-$slashNumber)"
+            if [[ -z $dirToTest ]]; then
+                echo "/"
+            else
+                echo "$dirToTest"
+            fi
+        }
+
+        # Defines $cur_dir on double_dots_cats() result
+        for i in $(seq 1 $paths_to_backward); do
+            cur_dir=$(double_dots_rm)
+        done
+        cur_dir=${cur_dir:1}
+        # Checks if directory exists
+        if [[ ! -z $(relative_backward_path $cur_dir) ]]; then
+            if [[ -z $(echo $resource_dir |sed 's/\.\.\///g') ]]; then
+                header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $cur_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            # If it doesn't, check if asked path exists
+            else
+                local remain_dir
+                # Removes all "../" and last "/" from $file_dir and contains it in $remain_dir
+                remain_dir=${resource_dir//..\//}
+                remain_dir=${remain_dir::-1}
+                header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $remain_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
+            fi
+            if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
+                # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
+                local resource_infos
+                resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
+                if [[ "${#mode}" == "0" ]]; then
+                    if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
+                        removeFile "$remain_dir"
+                    else
+                        echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
+                    fi
+                else
+                    echo "folder"
+                fi
+            else
+                echo "else 2"
+            fi
+        else
+            echo "else 1"
+        fi
+    fi
 }
 
 # Displays help on client side
@@ -598,6 +777,7 @@ function commande-help {
     echo -e "  pwd                                  Display absolute path to current directory"
     echo -e "  quit                                 Exit VSH client"
     echo -e "  rm     [-r] <filename_or_dirname>    Remove specified folder(s) or file(s)"
+    echo -e "  stop                                 Stops the server"
 }
 
 #####################################

@@ -31,11 +31,17 @@ To launch client on "extract" mode :
 		    [x] Relative path navigation
 		        [x] Forward navigation
 		        [x] Backward navigation
-		[ ] rm
-		    [ ] Absolute
-		    [ ] Relative
-		        [ ] Forward
-		        [ ] Backward
+		[o] rm
+		    [o] Absolute
+		        [x] File
+		        [ ] Directory
+		    [o] Relative
+		        [o] Forward
+                        [x] File
+                        [ ] Directory
+		        [o] Backward
+                        [x] File
+                        [ ] Directory
 		[x] ls
 		    [x] Absolute
 		    [x] Relative
