@@ -196,7 +196,7 @@ function getHeader {
     fin_header=$(head -n 1 $archive | cut -d: -f2)
     fin_header=$((fin_header - 1))
     for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
-        header="$header$(head -n $i $archive | tail -n+$i)\n"
+        header="$header$(head -n $i $archive |tail -n+$i)\n"
     done
     echo -e "$header"
 }
@@ -209,7 +209,7 @@ function getBody {
     body_end=$(cat $archive | wc -l)
     body_end=$((body_end+1))
     for i in `seq $body_start $body_end`; do
-        body="$body$(head -n $i $archive | tail -n+$i)\n"
+        body="$body$(head -n $i $archive |tail -n+$i)\n"
     done
     echo -e "$body"
 }
@@ -610,12 +610,11 @@ function commande-rm {
     fi
 
     function removeFile {
-        local resource_line dir_line header_before header_after new_header header_line_end directory
-        directory="$1"
+        local resource_line dir_line header_before header_after new_header header_line_end
         header_line_end=$(head -n 1 $archive | cut -d: -f2)
         header_line_end=$((header_line_end-1))
         resource_line=$(echo -e "$header_file" |grep -n "$asked_resource" |cut -d':' -f1)
-        dir_line=$(echo -e "$header" |grep -n "^directory $base_dir$directory$" |cut -d':' -f1)
+        dir_line=$(echo -e "$header" |grep -n "^directory $base_dir$resource_dir$" |cut -d':' -f1)
         #Select the part of the header before the line to delete
 		header_before=$(echo -e "$header" | head -n $(($dir_line+$resource_line-1)))
 		#Select the part of the header after the line to delete
@@ -624,6 +623,74 @@ function commande-rm {
         rm "$archive"
         echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
         echo "Deleted $asked_resource"
+    }
+
+    function removeFolder {
+        local found_folders_number asked_folder_root section_folder resource_line dir_line header_before header_after new_header header_line_end
+        header_line_end=$(head -n 1 $archive | cut -d: -f2)
+        header_line_end=$((header_line_end-1))
+        header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
+        resource_line=$(echo -e "$header_file" |grep -n "$asked_resource" |cut -d':' -f1)
+        #echo $(echo -e "$header" |grep -n "^directory $base_dir$resource_dir$asked_resource$")
+        dir_line=$(echo -e "$header" |grep -n "^directory $base_dir$resource_dir$" |cut -d':' -f1)
+        #Select the part of the header before the line to delete
+		header_before=$(echo -e "$header" | head -n $(($dir_line+$resource_line-1)))
+		#Select the part of the header after the line to delete
+		header_after=$(echo -e "$header" | tail -n $(($(echo -e "$header" | wc -l)-$dir_line-$resource_line)))
+        rm "$archive"
+        echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
+        echo "Deleted $asked_resource"
+        if [[ ${#resource_dir} == "0" ]]; then
+            base_dir=${base_dir::-1}
+        fi
+        found_folders_number=$(echo -e "$header" |grep "^directory $base_dir$resource_dir/$asked_resource.*$" |wc -l)
+        for i in `seq "1" "$found_folders_number"`; do
+        #for i in `seq "1" "1"`; do
+            header=$(getHeader $archive)
+            section_folder=$(echo -e "$header" |grep -m $i "^directory $base_dir$resource_dir/$asked_resource.*$")
+            if [[ "$i" == "1" ]]; then
+                header_file="$section_folder\n$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')\/$(echo $asked_resource |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")"
+            else
+                header_file="$section_folder\n$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')\/$(echo $asked_resource |sed 's/\//\\\//g').*$/d" |sed "/\@/q" |sed "/\@/d")"
+            fi
+            echo "=== header file ==="
+            echo -e "$header_file"
+            echo "==================="
+            header_file_length=$(echo -e "$header_file" |wc -l)
+            header_file_length=$((header_file_length+1))
+            for j in `seq "1" "$header_file_length"`; do
+                #echo $j
+                line_to_search=$(echo -e "$header_file" |head -n 1 |tail -n+1)
+                #echo "=== DEBUT HEADER FILE ==="
+                #echo -e "$header_file"
+                #echo "=== FIN HEADER FILE ==="
+                resource_line=$(echo -e "$header" |grep -n -m 1 "$line_to_search" |cut -d':' -f1)
+                #echo "on va jusqu'à $(($resource_line))"
+                #echo "on supprime $(($resource_line+1))"
+                #echo "on reprend  à $(($resource_line+2))"
+                #echo "###################"
+                header_before=$(echo -e "$header" | head -n $(($resource_line)))
+                #echo -e "$header_before"
+                resource_line_header_after=$((resource_line))
+                header_after=$(echo -e "$header" | tail -n $(($(echo -e "$header" | wc -l)-$resource_line_header_after)))
+                #echo -e "$header_after"
+                #echo "###################"
+                header_file="$(echo -e "$header_file" |sed '1d')"
+                if [[ "$j" == "$header_file_length" ]]; then
+                    header_before="$(echo -e "$header_before" |sed '$d')"
+                fi
+                echo "=== before ==="
+                echo -e "$header_before"
+                echo "== after ==="
+                echo -e "$header_after"
+                echo "============="
+            done
+            header_line_end=$(head -n 1 $archive | cut -d: -f2)
+            header_line_end=$((header_line_end-(header_file_length+1)))
+            #header_line_end=$((header_line_end-(header_file_length)))
+            rm "$archive"
+            echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
+        done
     }
 
     # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
@@ -640,11 +707,14 @@ function commande-rm {
             cur_dir=${cur_dir:1}
             resource_dir="$cur_dir/$resource_dir"
         fi
+        #echo "Resource directory : $resource_dir"
+        #echo $asked_resource
         # If $file_dir is just 1 character long or if the function is working we continue our tests further
         if [[ ${#resource_dir} == "1" || -z $(relative_forward_path $resource_dir) ]]; then
             if [[ "$resource_dir" =~ ^/$ ]]; then
                 resource_dir=""
             fi
+            #echo "Resource directory : $resource_dir"
             header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
             if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
                 # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
@@ -652,12 +722,13 @@ function commande-rm {
                 resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
                 if [[ "${#mode}" == "0" ]]; then
                     if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        removeFile "$resource_dir"
+                        #removeFile
+                        echo "c parti"
                     else
                         echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
                     fi
                 else
-                    echo "folder"
+                    removeFolder
                 fi
             else
                 echo "else 2"
@@ -692,11 +763,13 @@ function commande-rm {
                 resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
                 if [[ "${#mode}" == "0" ]]; then
                     if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        removeFile "$resource_dir"
+                        #removeFile
+                        echo "c parti"
                     else
                         echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
                     fi
                 else
+                    #removeFolder
                     echo "folder"
                 fi
             else
@@ -739,23 +812,26 @@ function commande-rm {
                 header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $cur_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
             # If it doesn't, check if asked path exists
             else
-                local remain_dir
                 # Removes all "../" and last "/" from $file_dir and contains it in $remain_dir
                 remain_dir=${resource_dir//..\//}
-                remain_dir=${remain_dir::-1}
+                #remain_dir=${remain_dir::-1}
+                echo $remain_dir
                 header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $remain_dir |sed 's/\//\\\//g')\/*$/d" |sed "/\@/q" |sed "/\@/d")
             fi
             if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
                 # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
                 local resource_infos
+                echo $remain_dir
                 resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
                 if [[ "${#mode}" == "0" ]]; then
                     if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        removeFile "$remain_dir"
+                        #removeFile
+                        echo "c parti"
                     else
                         echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
                     fi
                 else
+                    #removeFolder
                     echo "folder"
                 fi
             else
