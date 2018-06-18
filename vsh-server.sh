@@ -69,9 +69,35 @@ function commande-pwd {
     echo "$1"
 }
 
+function getHeader {
+    local archive fin_header header
+    archive=$1
+    # Stores all archive header's content in a $header variable used to perform tests
+    fin_header=$(head -n 1 $archive | cut -d: -f2)
+    fin_header=$((fin_header - 1))
+    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
+        header="$header$(head -n $i $archive |tail -n+$i)\n"
+    done
+    echo -e "$header"
+}
+
+function getBody {
+    local archive body_start body_end body
+    archive=$1
+    # Saves body start line and body end line
+    body_start=$(head -n 1 $archive | cut -d: -f2)
+    body_end=$(cat $archive | wc -l)
+    body_end=$((body_end+1))
+    for i in `seq $body_start $body_end`; do
+        body="$body$(head -n $i $archive |tail -n+$i)\n"
+    done
+    echo -e "$body"
+}
+
 function absolute_path {
     local asked_dir
     asked_dir=$1
+    header=$(getHeader $archive)
     # Checks if specified path ends with a "/", if it does, we simply remove it
     if [[ ! -z $(echo "$asked_dir" |grep "/$") ]]; then
         asked_dir=${asked_dir::-1}
@@ -89,11 +115,11 @@ function absolute_path {
 }
 
 function relative_backward_path {
-    local dots_nb paths_to_backward test asked_dir
+    local dots_nb paths_to_backward test asked_dir header
     asked_dir=$1
     dots_nb=$(echo $asked_dir |grep -o "\." |wc -l)
     paths_to_backward=$((dots_nb/2))
-
+    header=$(getHeader $archive)
     # Check if the number of "." is odd or even, if odd, returns nothing to display error on client side
     if (( $dots_nb % 2 )); then
         echo ""
@@ -156,7 +182,7 @@ function relative_backward_path {
 function relative_forward_path {
     local asked_dir
     asked_dir=$1
-
+    header=$(getHeader $archive)
     # Verifies if $asked_dir starts with a /, if not, we add it
     if [[ ${asked_dir:0:1} == "/" ]]; then
         asked_dir="/$asked_dir"
@@ -187,31 +213,6 @@ function relative_forward_path {
             echo ""
         fi
     fi
-}
-
-function getHeader {
-    local archive fin_header header
-    archive=$1
-    # Stores all archive header's content in a $header variable used to perform tests
-    fin_header=$(head -n 1 $archive | cut -d: -f2)
-    fin_header=$((fin_header - 1))
-    for i in `seq $(head -n 1 $archive | cut -d: -f1) $fin_header`; do
-        header="$header$(head -n $i $archive |tail -n+$i)\n"
-    done
-    echo -e "$header"
-}
-
-function getBody {
-    local archive body_start body_end body
-    archive=$1
-    # Saves body start line and body end line
-    body_start=$(head -n 1 $archive | cut -d: -f2)
-    body_end=$(cat $archive | wc -l)
-    body_end=$((body_end+1))
-    for i in `seq $body_start $body_end`; do
-        body="$body$(head -n $i $archive |tail -n+$i)\n"
-    done
-    echo -e "$body"
 }
 
 # Handles navigation in the archive using both relative and absolute paths
@@ -415,6 +416,9 @@ function commande-cat {
 
     # Checks if $file_dir starts with a letter/number or if it's empty to go in forward relative "navigation"
     if [[ $file_dir =~ ^[A-Za-z] || $file_dir =~ ^[0-9] || ${#file_dir} == "0" ]]; then
+        if [[ ${#file_dir} > "1" ]]; then
+            file_dir="${file_dir::-1}"
+        fi
         if [[ ${#file_dir} == "0" ]]; then
             file_dir="/"
         fi
@@ -464,10 +468,10 @@ function commande-cat {
                     echo "cat: $asked_file: Is a directory"
                 fi
             else
-                echo "else 2"
+                echo "cat: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "cat: no such file or directory"
         fi
     # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
     elif [ ${file_dir:0:1} == "/" ]; then
@@ -598,12 +602,10 @@ function commande-rm {
 
     header=$(getHeader $archive)
     body=$(getBody $archive)
-
     if [[ -z $(echo "$asked_resource" |grep "/") ]]; then
         resource_dir="$cur_dir/$resource_dir"
         modified_resource_dir="1"
     fi
-
     # If $asked_file beginning isn't "/" or "../", defines $file_dir on $cur_dir minus it's first character
     if [ ${asked_resource:0:1} != "/" -a ${asked_resource:0:3} != "../" ]; then
         resource_dir="${cur_dir:1}"
@@ -626,7 +628,7 @@ function commande-rm {
     }
 
     function removeFolder {
-        local found_folders_number asked_folder_root section_folder resource_line dir_line header_before header_after new_header header_line_end
+        local found_folders_number asked_folder_root section_folder resource_line dir_line header_before header_after header_file
         header_line_end=$(head -n 1 $archive | cut -d: -f2)
         header_line_end=$((header_line_end-1))
         header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
@@ -653,43 +655,19 @@ function commande-rm {
             else
                 header_file="$section_folder\n$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')\/$(echo $asked_resource |sed 's/\//\\\//g').*$/d" |sed "/\@/q" |sed "/\@/d")"
             fi
-            echo "=== header file ==="
-            echo -e "$header_file"
-            echo "==================="
+            line_to_search=$(echo -e "$header_file" |head -n 1 |tail -n+1)
+            resource_line=$(echo -e "$header" |grep -n -m 1 "$line_to_search" |cut -d':' -f1)
+            resource_line=$((resource_line))
             header_file_length=$(echo -e "$header_file" |wc -l)
-            header_file_length=$((header_file_length+1))
             for j in `seq "1" "$header_file_length"`; do
-                #echo $j
-                line_to_search=$(echo -e "$header_file" |head -n 1 |tail -n+1)
-                #echo "=== DEBUT HEADER FILE ==="
-                #echo -e "$header_file"
-                #echo "=== FIN HEADER FILE ==="
-                resource_line=$(echo -e "$header" |grep -n -m 1 "$line_to_search" |cut -d':' -f1)
-                #echo "on va jusqu'à $(($resource_line))"
-                #echo "on supprime $(($resource_line+1))"
-                #echo "on reprend  à $(($resource_line+2))"
-                #echo "###################"
-                header_before=$(echo -e "$header" | head -n $(($resource_line)))
-                #echo -e "$header_before"
-                resource_line_header_after=$((resource_line))
+                header_before=$(echo -e "$header" | head -n $(($resource_line-1)))
+                resource_line_header_after=$((resource_line+1))
                 header_after=$(echo -e "$header" | tail -n $(($(echo -e "$header" | wc -l)-$resource_line_header_after)))
-                #echo -e "$header_after"
-                #echo "###################"
-                header_file="$(echo -e "$header_file" |sed '1d')"
-                if [[ "$j" == "$header_file_length" ]]; then
-                    header_before="$(echo -e "$header_before" |sed '$d')"
-                fi
-                echo "=== before ==="
-                echo -e "$header_before"
-                echo "== after ==="
-                echo -e "$header_after"
-                echo "============="
+                header_line_end=$(head -n 1 $archive | cut -d: -f2)
+                header_line_end=$((header_line_end-1))
+                rm "$archive"
+                echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
             done
-            header_line_end=$(head -n 1 $archive | cut -d: -f2)
-            header_line_end=$((header_line_end-(header_file_length+1)))
-            #header_line_end=$((header_line_end-(header_file_length)))
-            rm "$archive"
-            echo -e "3:$header_line_end\n\n$header_before\n$header_after\n$body" > "$archive"
         done
     }
 
@@ -722,8 +700,7 @@ function commande-rm {
                 resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
                 if [[ "${#mode}" == "0" ]]; then
                     if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        #removeFile
-                        echo "c parti"
+                        removeFile
                     else
                         echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
                     fi
@@ -731,52 +708,54 @@ function commande-rm {
                     removeFolder
                 fi
             else
-                echo "else 2"
+                echo "rm: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "rm: no such file or directory"
         fi
     # Checks if first char from file_dir are "/", if yes, go through absolute "navigation"
     elif [ ${asked_resource:0:1} == "/" ]; then
-        resource_dir="$asked_resource"
-        nb_slash=$(echo "$asked_resource" |grep -o "/" |wc -l)
-        nb_slash=$(($nb_slash + 1))
-        asked_resource=$(echo "$asked_resource" | cut -d "/" -f$nb_slash)
-        resource_dir=${resource_dir::-${#asked_resource}}
-
-        if [[ "$resource_dir" =~ ^/$ ]]; then
-            resource_dir=""
+        if [[ ${#asked_resource} == "1" ]]; then
+            echo "Can't remove root"
         else
-            resource_dir=${resource_dir:1}
-            resource_dir=${resource_dir::-1}
-        fi
-        # Checks if $resource_dir exists in the header
-        if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$resource_dir/*$") ]]; then
+            resource_dir="$asked_resource"
+            nb_slash=$(echo "$asked_resource" |grep -o "/" |wc -l)
+            nb_slash=$(($nb_slash + 1))
+            asked_resource=$(echo "$asked_resource" | cut -d "/" -f$nb_slash)
+            resource_dir=${resource_dir::-${#asked_resource}}
+
             if [[ "$resource_dir" =~ ^/$ ]]; then
                 resource_dir=""
+            else
+                resource_dir=${resource_dir:1}
+                resource_dir=${resource_dir::-1}
             fi
-            header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
-            # Check if $asked_file exists in $header_file
-            if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
-                # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
-                local resource_infos
-                resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
-                if [[ "${#mode}" == "0" ]]; then
-                    if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        #removeFile
-                        echo "c parti"
+            # Checks if $resource_dir exists in the header
+            if [[ ! -z $(echo -e "$header" |grep "^directory $base_dir$resource_dir/*$") ]]; then
+                if [[ "$resource_dir" =~ ^/$ ]]; then
+                    resource_dir=""
+                fi
+                header_file=$(echo -e "$header" |sed "0,/^directory $(echo $base_dir |sed 's/\//\\\//g')$(echo $resource_dir |sed 's/\//\\\//g')$/d" |sed "/\@/q" |sed "/\@/d")
+                # Check if $asked_file exists in $header_file
+                if [[ ! -z $(echo -e "$header_file" |grep "$asked_resource ") ]]; then
+                    # Check if a mode is specified ("-r"), if it's not, we delete a file, if it is, we delete a folder and all it's content
+                    local resource_infos
+                    resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
+                    if [[ "${#mode}" == "0" ]]; then
+                        if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
+                            removeFile
+                        else
+                            echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
+                        fi
                     else
-                        echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
+                        removeFolder
                     fi
                 else
-                    #removeFolder
-                    echo "folder"
+                    echo "rm: no such file or directory"
                 fi
             else
-                echo "else 2"
+                echo "rm: no such file or directory"
             fi
-        else
-            echo "else 1"
         fi
     # Checks if first 3 chars from file_dir are "../", if yes, go through relative backward "navigation"
     elif [ ${asked_resource:0:3} == "../" ]; then
@@ -825,20 +804,18 @@ function commande-rm {
                 resource_infos=$(echo -e "$header_file" |grep "$asked_resource ")
                 if [[ "${#mode}" == "0" ]]; then
                     if [[ -z $(echo -e "$resource_infos" |cut -d " " -f2 |grep "d") ]]; then
-                        #removeFile
-                        echo "c parti"
+                        removeFile
                     else
                         echo "rm: $asked_resource: is a directory, please use '-r' to delete it"
                     fi
                 else
-                    #removeFolder
-                    echo "folder"
+                    removeFolder
                 fi
             else
-                echo "else 2"
+                echo "rm: no such file or directory"
             fi
         else
-            echo "else 1"
+            echo "rm: no such file or directory"
         fi
     fi
 }
@@ -852,7 +829,7 @@ function commande-help {
     echo -e "  ls                                   List files and folders in the current directory"
     echo -e "  pwd                                  Display absolute path to current directory"
     echo -e "  quit                                 Exit VSH client"
-    echo -e "  rm     [-r] <filename_or_dirname>    Remove specified folder(s) or file(s)"
+    echo -e "  rm     [-r] <filename_or_dirname>    Remove specified folder or file"
     echo -e "  stop                                 Stops the server"
 }
 
@@ -862,7 +839,7 @@ function commande-help {
 # Displays list of available archives on client side
 function commande-list {
     echo -e "Available archives:"
-    ls | grep ".arch"
+    ls | grep "\.arch$"
 }
 
 #####################################
