@@ -18,7 +18,7 @@ tete -rwxr-xr-x 42 9 3
 tyty -rw-r--r-- 42 12 3
 @
 directory test/B/B1
-caca -rw-r--r-- 42 15 1
+fichier -rw-r--r-- 42 15 1
 @
 #!/bin/bash
 echo "jesuislescripttoto"
@@ -34,4 +34,4 @@ done
 Je suis un simple fichier texte
 avec plusieurs lignes
 remplis de mots
-cacaman
+coucou je suis un fichier

@@ -16,7 +16,6 @@ To launch client on "browse" mode :
 To launch client on "extract" mode :
 `./vsh -extract <server_ip_address> <port> <archive_name>`
 
-
 # Necessary functions
 	[x] List
 	[o] Browse
@@ -31,17 +30,17 @@ To launch client on "extract" mode :
 		    [x] Relative path navigation
 		        [x] Forward navigation
 		        [x] Backward navigation
-		[o] rm
-		    [o] Absolute
+		[~] rm
+		    [~] Absolute
 		        [x] File
-		        [ ] Directory
-		    [o] Relative
-		        [o] Forward
+		        [~] Directory
+		    [~] Relative
+		        [~] Forward
                         [x] File
-                        [ ] Directory
-		        [o] Backward
+                        [~] Directory
+		        [~] Backward
                         [x] File
-                        [ ] Directory
+                        [~] Directory
 		[x] ls
 		    [x] Absolute
 		    [x] Relative

@@ -6,16 +6,20 @@
 
 # Envoi une commande au serveur et affiche la réponse ligne par ligne jusqu'à recontrer le texte "ENDRESPONSE"
 function sendCommand {
-	local line
-	local msg
-	while read line; do
-		if [[ $line == "ENDRESPONSE" ]]; then
-			break
-		else
-			msg="$msg$line\n"
-		fi
-	done < <(netcat "$ipAddress" "$port" <<< "$*")
-	echo "$(echo -e -n $msg)"
+	local line msg
+    while read line; do
+        if [[ $line == "ENDRESPONSE" ]]; then
+            break
+        else
+            msg="$msg$line\n"
+        fi
+    done < <(netcat "$ipAddress" "$port" <<< "$*")
+    echo "$(echo -e -n $msg)"
+}
+
+function sendStop {
+    $(netcat "$ipAddress" "$port" <<< "$*")
+    exit 0
 }
 
 # Fonction gérant l'affichage du "shell" vsh, envoi un message au serveur suivant la commande entrée par l'utilisateur
@@ -70,7 +74,7 @@ function browse {
 			    fi
 			;;
 			help) sendCommand $userInputCommand $archive;;
-			stop) sendCommand $userInputCommand $archive;;
+			stop) sendStop $userInputCommand $archive;;
 			quit) ;;
 			*) echo -e "\e[91mUnknown command, please try another command or type \e[3m\e[1mhelp\e[0m\e[91m to get a list of commands and their usage.\e[39m"
 		esac
@@ -132,10 +136,9 @@ function extract {
 	function calculdroit () {
 	if [ $# -eq 0 ]
 	then
-		echo "Il n'y a pas d'argument"
+		echo "There is no arguments"
 	else
 		right=$1
-		echo $line
 		nbc=$(echo -n $right | wc -c)
 		if [ $nbc -eq 9 ]
 		then
@@ -157,8 +160,8 @@ function extract {
 			((rights=$vgp1*100+$vgp2*10+$vgp3))
 			echo $rights
 		else
-			echo "Les droits ne sont pas enregistrés correctement"
-			echo "Veuillez les modifier au bon format"
+			echo "Rights aren't using the correct pattern"
+			echo "Please change them to the correct pattern"
 		fi
 	fi
 	}
@@ -216,7 +219,7 @@ function extract {
 						makefile $rig $name $d $f;;
 					d)#echo "c'est un dossier"
 						makedir $rig $name;;
-					*)echo "gros ton archive est foutu";;
+					*)echo "Archive looks to be corrupted.";;
 				esac
 			fi
 		done < header.temp
@@ -239,13 +242,11 @@ function extract {
 				do
 					if [ -f $i ]
 					then
-						echo $i
 						mv $i $active_dir/$i
 					fi
 					
 					if [ -d $i ]
 					then 
-						echo $i
 						mv $i $active_dir/$i
 					fi
 					
@@ -291,14 +292,14 @@ function extract {
 	rm $base_folder/header.temp $base_folder/body.temp $base_folder/$archive.temp
 }
 
-# Fonction permettant d'envoyer un message au serveur, lui demandant de retourner les archives présesntes
+# Gets list of remote archives
 function list {
 	sendCommand "list"
 }
 
-# Fonction affichant simplement comment utiliser la commande, à compléter
+# Displays how to use vsh
 function usage {
-	echo "usage"
+	echo "./vsh [–browse | -list | -extract] [server_ip_address] [port] <archive_name>"
 }
 
 #############################################################
@@ -309,27 +310,36 @@ function usage {
 if [[ $1 -eq "-browse" || $1 -eq "-list" || $1 -eq "-extract" ]]; then
 	mode="$1" #On défini la variable mode sur le mode qui a été entré au lancement du client
 	#On vérifie si l'adresse a un pattern d'adresse IP
-	if [[ $2 =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || $2 = ^[a-zA-Z]+$ ]]; then
+	if [[ $2 != "" ]]; then
 		ipAddress="$2" #On défini la variable ipAddress sur l'adresse qui a été entrée en paramètre
 		if [[ $3 =~ ^[0-9]+$ ]]; then
 			port="$3" #On défini la variable port sur le port qui a été entrée en paramètre
-			#echo "$mode"
-			#echo "$ipAddress"
-			#echo "$port"
 			archive="$4"
-			case $mode in
-				"-browse" ) browse;;
-				"-extract" ) extract;;
-				"-list" ) list;;
-				* ) usage;;
-			esac
-
+			if [[ $(list) == "" ]]; then
+                echo -e "\e[31mServer is unreachable, make sure to turn on the server before you connect to it\e[39m"
+                exit 1
+            else
+                if [[ ! -z $(list| grep $archive) ]]; then
+			        case $mode in
+				        "-browse" ) browse;;
+				        "-extract" ) extract;;
+				        "-list" ) list;;
+				        * ) usage;;
+			        esac
+			    else
+			        echo -e "\e[31mArchive not found on server, here's a lit of available archives : \e[39m"
+			        echo $(list)
+			    fi
+            fi
 		else
-			echo "Le port entré n'est pas correct"
+			echo "Specified port is incorrect"
+			usage
 		fi
 	else
-		echo "Ceci n'est pas une adresse"
+		echo "This is not a valid address"
+		usage
 	fi
 else
-	echo "mauvais mode sélectionné"
+	echo "Selected mode don't exists"
+	usage
 fi
