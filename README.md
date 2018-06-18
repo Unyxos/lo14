@@ -8,13 +8,13 @@ To launch server :
 # Client side
 
 To launch client on "list" mode : 
-`./vsh -list <server_ip_address> <port>`
+`./vsh.sh -list <server_ip_address> <port>`
 
 To launch client on "browse" mode :
-`./vsh -browse <server_ip_address> <port> <archive_name>`
+`./vsh.sh -browse <server_ip_address> <port> <archive_name>`
 
 To launch client on "extract" mode :
-`./vsh -extract <server_ip_address> <port> <archive_name>`
+`./vsh.sh -extract <server_ip_address> <port> <archive_name>`
 
 # Necessary functions
 	[x] List
@@ -23,18 +23,18 @@ To launch client on "extract" mode :
 		[x] cat
 		    [x] Absolute
 		    [x] Relative
-		        [x] Forward
+		        [~] Forward
 		        [x] Backward
 		[x] cd
 		    [x] Absolute path navigation
 		    [x] Relative path navigation
 		        [x] Forward navigation
 		        [x] Backward navigation
-		[~] rm
-		    [~] Absolute
+		[x] rm
+		    [x] Absolute
 		        [x] File
 		        [~] Directory
-		    [~] Relative
+		    [x] Relative
 		        [~] Forward
                         [x] File
                         [~] Directory
