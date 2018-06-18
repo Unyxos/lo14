@@ -306,40 +306,44 @@ function usage {
 #    Script principal appelant les fonctions précédentes    #
 #############################################################
 
-# Si $1 correspond soit à -browse, -list, ou -extract, on continue
-if [[ $1 -eq "-browse" || $1 -eq "-list" || $1 -eq "-extract" ]]; then
-	mode="$1" #On défini la variable mode sur le mode qui a été entré au lancement du client
-	#On vérifie si l'adresse a un pattern d'adresse IP
-	if [[ $2 != "" ]]; then
-		ipAddress="$2" #On défini la variable ipAddress sur l'adresse qui a été entrée en paramètre
-		if [[ $3 =~ ^[0-9]+$ ]]; then
-			port="$3" #On défini la variable port sur le port qui a été entrée en paramètre
-			archive="$4"
-			if [[ $(list) == "" ]]; then
-                echo -e "\e[31mServer is unreachable, make sure to turn on the server before you connect to it\e[39m"
-                exit 1
+if [[ "$#" == "3" || "$#" == "4" ]]; then
+    # Si $1 correspond soit à -browse, -list, ou -extract, on continue
+    if [[ $1 -eq "-browse" || $1 -eq "-list" || $1 -eq "-extract" ]]; then
+        mode="$1" #On défini la variable mode sur le mode qui a été entré au lancement du client
+        #On vérifie si l'adresse a un pattern d'adresse IP
+        if [[ $2 != "" ]]; then
+            ipAddress="$2" #On défini la variable ipAddress sur l'adresse qui a été entrée en paramètre
+            if [[ $3 =~ ^[0-9]+$ ]]; then
+                port="$3" #On défini la variable port sur le port qui a été entrée en paramètre
+                archive="$4"
+                if [[ $(list) == "" ]]; then
+                    echo -e "\e[31mServer is unreachable, make sure to turn on the server before you connect to it\e[39m"
+                    exit 1
+                else
+                    if [[ ! -z $(list| grep "$archive") ]]; then
+                        case $mode in
+                            "-browse" ) browse;;
+                            "-extract" ) extract;;
+                            "-list" ) list;;
+                            * ) usage;;
+                        esac
+                    else
+                        echo -e "\e[31mArchive not found on server, here's a lit of available archives : \e[39m"
+                        echo $(list)
+                    fi
+                fi
             else
-                if [[ ! -z $(list| grep $archive) ]]; then
-			        case $mode in
-				        "-browse" ) browse;;
-				        "-extract" ) extract;;
-				        "-list" ) list;;
-				        * ) usage;;
-			        esac
-			    else
-			        echo -e "\e[31mArchive not found on server, here's a lit of available archives : \e[39m"
-			        echo $(list)
-			    fi
+                echo "Specified port is incorrect"
+                usage
             fi
-		else
-			echo "Specified port is incorrect"
-			usage
-		fi
-	else
-		echo "This is not a valid address"
-		usage
-	fi
+        else
+            echo "This is not a valid address"
+            usage
+        fi
+    else
+        echo "Selected mode don't exists"
+        usage
+    fi
 else
-	echo "Selected mode don't exists"
-	usage
+    usage
 fi
